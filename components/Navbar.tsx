@@ -22,6 +22,35 @@ export default function Navbar() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Game[]>([]);
 
+  // 🔥 KEY FIX — Navbar keeps its own live avatar
+  const [navAvatar, setNavAvatar] = useState<string | undefined>(
+    user?.avatar
+  );
+
+  // 🔥 GUARANTEED SYNC (POLLING) — runs every 3 seconds
+  useEffect(() => {
+    if (!session) return;
+
+    const interval = setInterval(() => {
+      fetch("/api/user/me", { cache: "no-store" })
+        .then(res => res.json())
+        .then(data => {
+          if (data?.user?.avatar) {
+            setNavAvatar(data.user.avatar);
+          }
+        })
+        .catch(() => {});
+    }, 3000); // every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [session]);
+
+  // also sync instantly if provider ever changes
+  useEffect(() => {
+    if (user?.avatar) {
+      setNavAvatar(user.avatar);
+    }
+  }, [user?.avatar]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -46,7 +75,6 @@ export default function Navbar() {
           VaultggB
         </Link>
 
-     
         <div className="hidden sm:flex items-center gap-6">
 
           <Link href="/discover" className="text-gray-300 hover:text-white text-sm">
@@ -57,7 +85,6 @@ export default function Navbar() {
             Browse
           </Link>
 
-   
           <div className="relative">
             <input
               value={query}
@@ -95,10 +122,14 @@ export default function Navbar() {
             </AnimatePresence>
           </div>
 
-
-              {session?.user?.role === "admin" && (
-            <Link href="/admin"    className="text-pink-500 hover:text-pink-600 text-sm"  >Admin</Link>
-              )}
+          {session?.user?.role === "admin" && (
+            <Link
+              href="/admin"
+              className="text-pink-500 hover:text-pink-600 text-sm"
+            >
+              Admin
+            </Link>
+          )}
 
           {!session ? (
             <Link href="/login" className="text-pink-500 hover:text-pink-600 text-sm">
@@ -108,7 +139,7 @@ export default function Navbar() {
             <>
               <Link href="/user/me">
                 <Image
-                  src={user?.avatar || "/avatar-placeholder.png"}
+                  src={navAvatar || "/avatar-placeholder.png"}  // LIVE AVATAR
                   alt="Avatar"
                   width={36}
                   height={36}
@@ -142,7 +173,6 @@ export default function Navbar() {
             exit={{ height: 0, opacity: 0 }}
             className="sm:hidden bg-black/80 border-t border-white/10 px-4 py-4 space-y-5"
           >
-            {/* Mobile Search */}
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -172,7 +202,6 @@ export default function Navbar() {
               Browse
             </Link>
 
-
             {session && (
               <Link
                 href="/user/me"
@@ -180,7 +209,7 @@ export default function Navbar() {
                 className="flex items-center gap-3 pt-2"
               >
                 <Image
-                  src={user?.avatar || "/avatar-placeholder.png"}
+                  src={navAvatar || "/avatar-placeholder.png"} 
                   alt="Avatar"
                   width={40}
                   height={40}

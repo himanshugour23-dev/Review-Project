@@ -20,12 +20,11 @@ export default function HomePage() {
     fetch('/api/games/Home')
       .then(res => res.json())
       .then(data => {
-        console.log("Fetched featured games:", data);
+
         setGames(data?.recommended || []);
         setLoading(false);
       })
       .catch(err => {
-        console.error("Home fetch error:", err);
         setLoading(false);
       });
   }, []);

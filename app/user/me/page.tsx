@@ -35,7 +35,6 @@ export default function ProfilePage() {
   const reviewRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-
   useEffect(() => {
     fetch("/api/user/me", { cache: "no-store" })
       .then(res => res.json())
@@ -48,7 +47,6 @@ export default function ProfilePage() {
       .catch(() => setLoading(false));
   }, []);
 
-
   const scroll = (
     ref: React.RefObject<HTMLDivElement | null>,
     dir: "left" | "right"
@@ -58,7 +56,7 @@ export default function ProfilePage() {
     const card = ref.current.querySelector<HTMLElement>(".scroll-card");
     if (!card) return;
 
-    const gap = 16; 
+    const gap = 16;
     const amount = card.offsetWidth + gap;
 
     ref.current.scrollBy({
@@ -67,7 +65,7 @@ export default function ProfilePage() {
     });
   };
 
-  
+  /* ---------- Avatar upload ---------- */
   const handleAvatarUpload = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -97,6 +95,31 @@ export default function ProfilePage() {
     }
   };
 
+  /* ---------- REMOVE FROM FAVOURITES ---------- */
+  const removeFromFavourites = async (gameId: string) => {
+    try {
+      const res = await fetch("/api/user/me/favourite/remove", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId }),
+      });
+
+      if (!res.ok) throw new Error("Failed to remove");
+
+      // Optimistic UI update
+      setUser(prev =>
+        prev
+          ? {
+              ...prev,
+              favoriteGames: prev.favoriteGames.filter(g => g._id !== gameId),
+            }
+          : prev
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -107,8 +130,7 @@ export default function ProfilePage() {
 
   return (
     <div className="bg-black text-white min-h-screen px-6 pt-24 max-w-7xl mx-auto">
-
-    
+      {/* ---------- PROFILE HEADER ---------- */}
       <section className="flex items-start gap-6 mb-10">
         <div className="relative w-24 h-24 rounded-full overflow-hidden bg-zinc-800">
           <Image
@@ -130,7 +152,9 @@ export default function ProfilePage() {
           type="file"
           hidden
           accept="image/*"
-          onChange={e => e.target.files && handleAvatarUpload(e.target.files[0])}
+          onChange={e =>
+            e.target.files && handleAvatarUpload(e.target.files[0])
+          }
         />
 
         <div className="flex-1">
@@ -146,7 +170,10 @@ export default function ProfilePage() {
                   rows={3}
                 />
                 <div className="flex gap-2 mt-2">
-                  <button onClick={saveBio} className="px-3 py-1 bg-indigo-600 rounded">
+                  <button
+                    onClick={saveBio}
+                    className="px-3 py-1 bg-indigo-600 rounded"
+                  >
                     Save
                   </button>
                   <button
@@ -170,6 +197,7 @@ export default function ProfilePage() {
         </div>
       </section>
 
+      {/* ---------- FAVOURITES ---------- */}
       <section className="mb-12">
         <div className="flex justify-between mb-4">
           <h2 className="text-xl font-semibold">My Favourites</h2>
@@ -199,6 +227,29 @@ export default function ProfilePage() {
                   transform-gpu
                 "
               >
+                {/* REMOVE BUTTON */}
+                <button
+                  onClick={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    removeFromFavourites(g._id);
+                  }}
+                  className="
+                    absolute top-2 right-2 z-20
+                    h-7 w-7 rounded-full
+                    bg-black/60 backdrop-blur
+                    text-white text-sm
+                    flex items-center justify-center
+                    opacity-100 sm:opacity-0
+                    sm:group-hover:opacity-100
+                    transition-opacity duration-300
+                    hover:bg-red-500
+                  "
+                  aria-label="Remove from favourites"
+                >
+                  ✕
+                </button>
+
                 <Image
                   src={g.coverImage}
                   alt={g.name}
@@ -223,7 +274,7 @@ export default function ProfilePage() {
         </div>
       </section>
 
-   
+      {/* ---------- REVIEWS ---------- */}
       <section>
         <div className="flex justify-between mb-4">
           <h2 className="text-xl font-semibold">My Reviews</h2>

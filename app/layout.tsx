@@ -2,6 +2,7 @@ import "./globals.css";
 import AppShell from "./AppShell";
 import PWARegister from "./pwa-register";
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 export const metadata = {
   title: "Game Review Hub",
   description: "Game reviews platform",
@@ -22,6 +23,7 @@ export default function RootLayout({
         {/* Client UI shell */}
         <AppShell>
           {children}
+          <Analytics />
           <SpeedInsights />
         </AppShell>
       </body>

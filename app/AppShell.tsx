@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
-/* ---------- Smooth scroll on route change ---------- */
+
 function ScrollToTop() {
   const pathname = usePathname();
 
@@ -27,13 +27,12 @@ export default function AppShell({
 
   return (
     <Providers>
-      {/* Persistent Navbar */}
+     
       <Navbar />
 
-      {/* Scroll handler */}
+   
       <ScrollToTop />
 
-      {/* Page transitions */}
       <AnimatePresence mode="wait">
         <motion.main
           key={pathname}
@@ -46,7 +45,7 @@ export default function AppShell({
         </motion.main>
       </AnimatePresence>
 
-      {/* Toasts */}
+    
       <Toaster
         position="top-center"
         toastOptions={{

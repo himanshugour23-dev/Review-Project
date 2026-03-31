@@ -5,9 +5,6 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Github } from "lucide-react";
 import { signIn } from "next-auth/react";
-
-
-
 export default function LoginPage() {
   return (
     <main className="relative min-h-screen flex items-center justify-center text-white">
@@ -40,8 +37,6 @@ export default function LoginPage() {
             Rate. Review. Discover the games you love.
           </p>
         </div>
-
-
         <div className="mt-8 space-y-4">
           <button
             className="w-full flex items-center justify-center gap-3 py-3 rounded-xl bg-white bg-opacity-50 text-black font-medium hover:bg-gray-200 transition"
@@ -59,8 +54,6 @@ export default function LoginPage() {
             Continue with GitHub
           </button>
         </div>
-
-        {/* Continue without login */}
         <div className="mt-6 text-center">
           <Link
             href="/"

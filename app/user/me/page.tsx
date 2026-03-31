@@ -31,7 +31,6 @@ export default function ProfilePage() {
   const [editingBio, setEditingBio] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
 
-  // 🔥 NEW STATES (only additions in your file)
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [toast, setToast] = useState<null | { type: "success" | "error"; msg: string }>(null);
 
@@ -69,7 +68,6 @@ export default function ProfilePage() {
     });
   };
 
-  /* ---------- Avatar upload (FIXED UX VERSION) ---------- */
   const handleAvatarUpload = async (file: File) => {
     try {
       setAvatarLoading(true);
@@ -105,7 +103,6 @@ export default function ProfilePage() {
     }
   };
 
-  /* ---------- Save bio ---------- */
   const saveBio = async () => {
     const res = await fetch("/api/user/me", {
       method: "PATCH",
@@ -119,7 +116,7 @@ export default function ProfilePage() {
     }
   };
 
-  /* ---------- REMOVE FROM FAVOURITES ---------- */
+
   const removeFromFavourites = async (gameId: string) => {
     try {
       const res = await fetch("/api/user/me/favourite/remove", {
@@ -153,7 +150,7 @@ export default function ProfilePage() {
 
   return (
     <>
-      {/* ---------- TOAST UI (NEW) ---------- */}
+      
       {toast && (
         <div
           className={`
@@ -166,7 +163,7 @@ export default function ProfilePage() {
       )}
 
       <div className="bg-black text-white min-h-screen px-6 pt-24 max-w-7xl mx-auto">
-        {/* ---------- PROFILE HEADER ---------- */}
+        
         <section className="flex items-start gap-6 mb-10">
           <div className="relative w-24 h-24 rounded-full overflow-hidden bg-zinc-800">
             <Image
@@ -241,7 +238,6 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* ---------- FAVOURITES ---------- */}
         <section className="mb-12">
           <div className="flex justify-between mb-4">
             <h2 className="text-xl font-semibold">My Favourites</h2>
@@ -287,7 +283,6 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* ---------- REVIEWS ---------- */}
         <section>
           <div className="flex justify-between mb-4">
             <h2 className="text-xl font-semibold">My Reviews</h2>

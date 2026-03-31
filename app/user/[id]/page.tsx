@@ -1,10 +1,8 @@
 "use client";
-
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-
 interface Game {
   _id: string;
   name: string;

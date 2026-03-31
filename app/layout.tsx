@@ -17,10 +17,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-black text-white">
-        {/* Client-only PWA registration */}
+  
         <PWARegister />
 
-        {/* Client UI shell */}
+
         <AppShell>
           {children}
           <Analytics />

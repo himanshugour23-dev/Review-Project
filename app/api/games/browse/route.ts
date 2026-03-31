@@ -64,8 +64,6 @@ export async function GET(req: Request) {
           },
         },
       ]).allowDiskUse(true),
-
-
       Game.countDocuments(),
     ]);
 

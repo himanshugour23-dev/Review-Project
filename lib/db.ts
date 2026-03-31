@@ -33,7 +33,6 @@ export async function connectToDatabase() {
       family: 4, 
     });
   }
-
   try {
     cached.conn = await cached.promise;
   } catch (error) {

@@ -11,6 +11,7 @@ VaultGG is a full-stack, API-first platform built for gamers to discover, rate, 
 - **Role-Based Access Control (RBAC):** Separate tiers for standard users and administrators. Admins have dedicated moderation tools to enforce platform content guidelines and manage community reviews.
 - **Comprehensive Catalog Management:** Seamless interfaces handling user lists, detailed game metadata, custom ratings, and profile customizations.
 - **Organic Catalog Building:** Designed to grow its local database richness progressively as users interact with, search for, and cache new game data over time.
+- **Atomic comments and Like system Applied on DataBase Level
 ## 🛠️ Tech Stack
 - **Frontend:** React.js, Next.js (App Router), Tailwind CSS
 - **Backend:** Node.js, Next.js API Routes / Server Actions

@@ -34,15 +34,14 @@ export default function NetworkWarningPopup() {
         </h2>
 
         <p className="text-sm text-gray-600 leading-relaxed">
-          Please use your <b>own internet connection</b>.
-          <br />
-          Many institute networks block game-related pages, so some routes may not
-          load properly.
-        </p>
+            Some networks may block access to game-related services.
+            <br />
+            If certain routes do not load properly, please switch to a different network and try again.
+          </p>
 
-        <p className="mt-4 text-right text-sm text-gray-500">
-          Thank you 
-        </p>
+          <p className="mt-4 text-right text-sm text-gray-500">
+            Thank you.
+          </p>
       </div>
     </div>
   );

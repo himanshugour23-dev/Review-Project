@@ -31,7 +31,7 @@ const ReviewSchema = new Schema<IReview>(
       type: String,
       trim: true,
       maxlength: 3000,
-      default: null, // IMPORTANT
+      default: null, 
     },
   },
   {

@@ -128,7 +128,6 @@ const DarkRating = styled(Rating)({
       setReviews(updated.reviews);
       setGame(updated.game);
 
-      // ✅ Clear text field and rating after successful submission
       setReviewText("");
       setRating(null);
 
@@ -159,7 +158,6 @@ if (loading) {
     count,
   }));
 
-  // ✅ Reorder reviews so the logged-in user's review appears on top
   let orderedReviews = [...reviews];
   if (session) {
     const idx = orderedReviews.findIndex(r => r.userId._id === session.user.id);
@@ -185,7 +183,7 @@ if (loading) {
 
       <main className="relative -mt-20 sm:-mt-32 max-w-6xl mx-auto px-4 sm:px-6 text-white">
         <div className="flex flex-col md:flex-row gap-6 sm:gap-8">
-          {/* Poster */}
+         
           <Image
             src={game.coverImage}
             unoptimized

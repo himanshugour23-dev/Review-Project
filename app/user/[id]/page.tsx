@@ -1,8 +1,11 @@
 "use client";
+
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 interface Game {
   _id: string;
   name: string;
@@ -27,22 +30,24 @@ export default function PublicProfilePage() {
 
   const [user, setUser] = useState<User | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const favRef = useRef<HTMLDivElement | null>(null);
   const reviewRef = useRef<HTMLDivElement | null>(null);
 
-
   useEffect(() => {
     if (!id) return;
 
-    fetch(`/api/user/${id}`, { cache: "no-store" })
-      .then(res => {
+    fetch(`/api/user/${id}`, {
+      cache: "no-store",
+    })
+      .then((res) => {
         if (!res.ok) throw new Error("Failed");
         return res.json();
       })
-      .then(data => {
+      .then((data) => {
         setUser(data.user);
         setReviews(data.reviews);
         setLoading(false);
@@ -53,174 +58,288 @@ export default function PublicProfilePage() {
       });
   }, [id]);
 
-
   const scroll = (
     ref: React.RefObject<HTMLDivElement | null>,
     dir: "left" | "right"
   ) => {
     if (!ref.current) return;
 
-    const card = ref.current.querySelector<HTMLElement>(".scroll-card");
+    const card =
+      ref.current.querySelector<HTMLElement>(".scroll-card");
+
     if (!card) return;
 
-    const gap = 16;
-    const amount = card.offsetWidth + gap;
-
     ref.current.scrollBy({
-      left: dir === "left" ? -amount : amount,
+      left:
+        dir === "left"
+          ? -(card.offsetWidth + 16)
+          : card.offsetWidth + 16,
       behavior: "smooth",
     });
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        Loading profile…
+      <div className="flex min-h-screen items-center justify-center bg-black text-white">
+        Loading profile...
       </div>
     );
   }
 
   if (error || !user) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-black text-white">
         Profile not found
       </div>
     );
   }
 
   return (
-    <div className="bg-black text-white min-h-screen px-6 pt-24 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-black text-white">
 
-     
-      <section className="flex items-start gap-6 mb-10">
-        <div className="relative w-24 h-24 rounded-full overflow-hidden bg-zinc-800">
-          <Image
-            src={user.avatar || "/avatar-placeholder.png"}
-            alt={user.name}
-            fill
-            className="object-cover"
-          />
-        </div>
+      <section className="relative overflow-hidden border-b border-white/10">
 
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold">{user.name}</h1>
-          <p className="mt-2 text-sm text-gray-400">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,.18),transparent_55%)]" />
+
+        <div className="relative mx-auto flex max-w-7xl flex-col items-center px-5 pt-28 pb-16 text-center">
+
+          <div className="relative h-32 w-32 overflow-hidden rounded-full ring-4 ring-white/10 shadow-2xl">
+
+            <Image
+              src={user.avatar || "/avatar-placeholder.png"}
+              alt={user.name}
+              fill
+              className="object-cover"
+            />
+
+          </div>
+
+          <h1 className="mt-6 text-5xl font-black tracking-tight">
+            {user.name}
+          </h1>
+
+          <p className="mt-4 max-w-2xl text-gray-400 leading-7">
             {user.bio || "No bio provided."}
           </p>
+
+          <div className="mt-8 flex gap-10 text-center">
+
+            <div>
+              <p className="text-3xl font-bold">
+                {user.favoriteGames.length}
+              </p>
+
+              <p className="text-sm text-gray-500">
+                Favorites
+              </p>
+            </div>
+
+            <div>
+              <p className="text-3xl font-bold">
+                {reviews.length}
+              </p>
+
+              <p className="text-sm text-gray-500">
+                Reviews
+              </p>
+            </div>
+
+          </div>
+
         </div>
+
       </section>
 
-    
-      {user.favoriteGames.length > 0 && (
-        <section className="mb-12">
-          <div className="flex justify-between mb-4">
-            <h2 className="text-xl font-semibold">Favourite Games</h2>
-            <div className="flex gap-2">
-              <button onClick={() => scroll(favRef, "left")}>←</button>
-              <button onClick={() => scroll(favRef, "right")}>→</button>
+      <main className="mx-auto max-w-7xl px-5 py-12">
+              {user.favoriteGames.length > 0 && (
+        <section className="mb-16">
+
+          <div className="mb-8 flex items-center justify-between">
+
+            <div>
+              <h2 className="text-3xl font-bold">
+                Favorite Games
+              </h2>
+
+              <p className="mt-1 text-sm text-gray-500">
+                Games this user loves the most.
+              </p>
             </div>
+
+            <div className="flex gap-3">
+
+              <button
+                onClick={() => scroll(favRef, "left")}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10"
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              <button
+                onClick={() => scroll(favRef, "right")}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10"
+              >
+                <ChevronRight size={18} />
+              </button>
+
+            </div>
+
           </div>
 
           <div
             ref={favRef}
-            className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth"
+            className="flex gap-6 overflow-x-auto scroll-smooth scrollbar-hide"
           >
-            {user.favoriteGames.map(g => (
+            {user.favoriteGames.map((game) => (
               <Link
-                key={g._id}
-                href={`/game/${g.slug}`}
-                className="group min-w-[180px] scroll-card"
+                key={game._id}
+                href={`/game/${game.slug}`}
+                className="group scroll-card min-w-[200px]"
               >
-                <div
-                  className="
-                    relative w-[180px] h-[240px] rounded-xl overflow-hidden
-                    bg-zinc-900
-                    transition-transform duration-300
-                    hover:-translate-y-1
-                    will-change-transform
-                    transform-gpu
-                  "
-                >
-                  <Image
-                    src={g.coverImage}
-                    alt={g.name}
-                    fill
-                    unoptimized
-                    className="
-                      object-cover
-                      transition-transform duration-700 ease-out
-                      group-hover:scale-110
-                      group-hover:rotate-[0.5deg]
-                      will-change-transform
-                      transform-gpu
-                      backface-hidden
-                    "
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                  <div className="absolute inset-0 ring-1 ring-white/5 group-hover:ring-indigo-400/30 transition-all duration-500" />
+
+                <div className="relative overflow-hidden rounded-xl bg-zinc-900 shadow-2xl ring-1 ring-white/5 transition-all duration-300 group-hover:-translate-y-2 group-hover:ring-blue-500/40">
+
+                  <div className="relative aspect-[2/3]">
+
+                    <Image
+                      src={game.coverImage}
+                      alt={game.name}
+                      fill
+                      unoptimized
+                      className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                    />
+
+                  </div>
+
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+                  <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+                  <div className="absolute bottom-0 left-0 right-0 p-4">
+
+                    <h3 className="truncate text-sm font-semibold">
+                      {game.name}
+                    </h3>
+
+                  </div>
+
                 </div>
-                <p className="text-sm mt-1 truncate">{g.name}</p>
+
               </Link>
             ))}
           </div>
+
         </section>
       )}
 
-     
       {reviews.length > 0 && (
+
         <section>
-          <div className="flex justify-between mb-4">
-            <h2 className="text-xl font-semibold">Recent Reviews</h2>
-            <div className="flex gap-2">
-              <button onClick={() => scroll(reviewRef, "left")}>←</button>
-              <button onClick={() => scroll(reviewRef, "right")}>→</button>
+
+          <div className="mb-8 flex items-center justify-between">
+
+            <div>
+
+              <h2 className="text-3xl font-bold">
+                Recent Reviews
+              </h2>
+
+              <p className="mt-1 text-sm text-gray-500">
+                Latest reviews written by {user.name}.
+              </p>
+
             </div>
+
+            <div className="flex gap-3">
+
+              <button
+                onClick={() => scroll(reviewRef, "left")}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10"
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              <button
+                onClick={() => scroll(reviewRef, "right")}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10"
+              >
+                <ChevronRight size={18} />
+              </button>
+
+            </div>
+
           </div>
 
           <div
             ref={reviewRef}
-            className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth"
+            className="flex gap-6 overflow-x-auto scroll-smooth scrollbar-hide"
           >
-            {reviews.map(r => (
+                        {reviews.map((review) => (
               <Link
-                key={r._id}
-                href={`/game/${r.gameId.slug}`}
-                className="group min-w-[180px] scroll-card"
+                key={review._id}
+                href={`/game/${review.gameId.slug}`}
+                className="group scroll-card min-w-[200px]"
               >
-                <div
-                  className="
-                    relative w-[180px] h-[240px] rounded-xl overflow-hidden
-                    bg-zinc-900
-                    transition-transform duration-300
-                    hover:-translate-y-1
-                    will-change-transform
-                    transform-gpu
-                  "
-                >
-                  <Image
-                    src={r.gameId.coverImage}
-                    alt={r.gameId.name}
-                    fill
-                    unoptimized
-                    className="
-                      object-cover
-                      transition-transform duration-700 ease-out
-                      group-hover:scale-110
-                      group-hover:rotate-[0.5deg]
-                      will-change-transform
-                      transform-gpu
-                      backface-hidden
-                    "
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                  <div className="absolute inset-0 ring-1 ring-white/5 group-hover:ring-indigo-400/30 transition-all duration-500" />
+
+                <div className="relative overflow-hidden rounded-xl bg-zinc-900 shadow-2xl ring-1 ring-white/5 transition-all duration-300 group-hover:-translate-y-2 group-hover:ring-blue-500/40">
+
+                  <div className="relative aspect-[2/3]">
+
+                    <Image
+                      src={review.gameId.coverImage}
+                      alt={review.gameId.name}
+                      fill
+                      unoptimized
+                      className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                    />
+
+                  </div>
+
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+                  <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+                  <div className="absolute bottom-0 left-0 right-0 p-4">
+
+                    <span className="inline-flex rounded-full bg-blue-500/20 px-2 py-1 text-xs font-medium text-blue-300">
+                      Review
+                    </span>
+
+                    <h3 className="mt-2 truncate text-sm font-semibold">
+                      {review.gameId.name}
+                    </h3>
+
+                    <p className="mt-1 text-xs text-gray-400">
+                      View review →
+                    </p>
+
+                  </div>
+
                 </div>
-                <p className="text-sm mt-1 truncate">{r.gameId.name}</p>
+
               </Link>
             ))}
           </div>
+
         </section>
       )}
+
+      {user.favoriteGames.length === 0 && reviews.length === 0 && (
+        <div className="rounded-2xl border border-white/10 bg-white/5 py-20 text-center">
+
+          <h2 className="text-2xl font-semibold">
+            Nothing here yet
+          </h2>
+
+          <p className="mt-3 text-gray-400">
+            This user hasn't added favorite games or written any reviews.
+          </p>
+
+        </div>
+      )}
+
+      </main>
+
     </div>
   );
 }

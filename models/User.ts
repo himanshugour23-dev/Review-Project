@@ -28,6 +28,11 @@ export interface IUser {
   
   createdAt?: Date;
   updatedAt?: Date;
+  subscription?: {
+  isPremium: boolean;
+  purchasedAt?: Date;
+  expiresAt?: Date;
+};
 }
 
 const UserSchema = new Schema<IUser>(
@@ -100,8 +105,21 @@ const UserSchema = new Schema<IUser>(
   falseReportCount : {
     type : Number,
     default : 0
-  }
-
+  },
+   subscription: {
+  isPremium: {
+    type: Boolean,
+    default: false,
+  },
+  purchasedAt: {
+    type: Date,
+    default: null,
+  },
+  expiresAt: {
+    type: Date,
+    default: null,
+  },
+},
   },
   {
     timestamps: true,

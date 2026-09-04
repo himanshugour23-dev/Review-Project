@@ -7,7 +7,7 @@ const features = [
   {
     title: 'Track your personal game collection',
     description:
-      "Track every game you've played, are currently playing, or want to play. VaultggB helps you stay organized and build your personal gaming library effortlessly.",
+      "Track every game you've played, are currently playing, or want to play. baclogged helps you stay organized and build your personal gaming library effortlessly.",
     image: '/774617.png',
     alt: 'Track your collection',
   },
@@ -36,7 +36,7 @@ export default function FeatureOverview() {
       <div className="relative mx-auto max-w-7xl px-5 sm:px-6">
         <div className="mb-16 text-center">
           <p className="text-[11px] font-bold uppercase tracking-[0.35em] text-blue-400">
-            Why VaultggB
+            Why baclogged
           </p>
 
           <h2 className="mt-4 text-4xl font-black sm:text-5xl">
@@ -65,7 +65,7 @@ export default function FeatureOverview() {
                 }
               `}
             >
-              {/* Image */}
+
               <div className="group">
                 <div
                   className=" relative aspect-[16/10] overflow-hidden rounded-xl  bg-zinc-900 shadow-2xl ring-1  ring-white/10 transition-all duration-500  group-hover:ring-blue-500/40
@@ -85,7 +85,7 @@ export default function FeatureOverview() {
                 </div>
               </div>
 
-              {/* Content */}
+
               <div className="max-w-xl">
                 <div className="mb-5 h-px w-16 bg-blue-500" />
 

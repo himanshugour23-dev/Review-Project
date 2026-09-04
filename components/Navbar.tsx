@@ -5,16 +5,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Search,
-  Menu,
-  X,
-  LogOut,
-  Compass,
-  Library,
-  Shield,
+import {Search,Menu,X,LogOut,Compass,Library,Shield,
 } from "lucide-react";
 import { useUser } from "@/app/providers/UserProvider";
+
 
 interface Game {
   _id: string;
@@ -33,9 +27,9 @@ export default function Navbar() {
   const [navAvatar, setNavAvatar] = useState<string | undefined>(
     user?.avatar
   );
+
   useEffect(() => {
     if (!session) return;
-
     const interval = setInterval(() => {
       fetch("/api/user/me", { cache: "no-store" })
         .then((res) => res.json())
@@ -78,10 +72,18 @@ return (
         href="/"
         className="text-2xl font-black tracking-tight hover:text-blue-400 transition"
       >
-        VaultggB
+        baclogged
       </Link>
 
       <div className="hidden lg:flex items-center gap-8">
+
+        <Link
+          href="/checkoutPageDetails"
+          className="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition"
+        >
+          <Library size={16} />
+          Premium
+        </Link>
 
         <Link
           href="/discover"
@@ -95,7 +97,7 @@ return (
           href="/browse"
           className="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition"
         >
-          <Library size={16} />
+        <Library size={16} />
           Browse
         </Link>
 

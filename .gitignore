@@ -10,20 +10,20 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# ===== Environment secrets (MOST IMPORTANT) =====
+
 .env
 .env.local
 .env.development
 .env.production
 .env*.local
 
-# ===== Vercel =====
+
 .vercel/
 
-# ===== OS junk =====
+
 .DS_Store
 Thumbs.db
 
-# ===== Editor junk =====
+
 .vscode/
 .idea/

@@ -29,10 +29,10 @@ export interface IUser {
   createdAt?: Date;
   updatedAt?: Date;
   subscription?: {
-  isPremium: boolean;
-  purchasedAt?: Date;
-  expiresAt?: Date;
-};
+        isPremium: boolean;
+        purchasedAt?: Date;
+        expiresAt?: Date;
+  };
 }
 
 const UserSchema = new Schema<IUser>(

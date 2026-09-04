@@ -41,7 +41,7 @@ export default function HomePage() {
             className="max-w-3xl"
           >
             <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.35em] text-blue-400">
-              VaultggB
+              baclogged
             </p>
 
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-none">

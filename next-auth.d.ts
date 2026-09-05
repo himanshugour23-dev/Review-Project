@@ -8,7 +8,7 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      provider?: string;
+      provider: "google" | "github";
       providerId?: string;
       role ?: "admin" | "user";
     } & DefaultSession["user"];
@@ -18,7 +18,7 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     userId?: string;
-    provider?: string;
+    provider: "google" | "github";
     providerId?: string;
   }
 }

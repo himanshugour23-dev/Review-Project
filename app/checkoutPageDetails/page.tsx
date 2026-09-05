@@ -59,7 +59,7 @@ export default function CheckoutPage() {
 
           <p className="mt-5 text-base leading-7 text-zinc-400 sm:text-lg">
             Get deeper information about games, creators, developers,
-            communities, stores and DLCs — all in one place.
+            communities, stores and DLCs  all in one place.
           </p>
         </div>
 
@@ -200,9 +200,9 @@ export default function CheckoutPage() {
 
                           <p className="mt-1 text-xs leading-5 text-zinc-500">
                             This is only a Razorpay test environment.
-                            Simply click the payment button to get Premium.
+                            Simply click the payment button  choose net banking to get Premium.
                             It is completely free and no real money will be
-                            charged.
+                            charged just click on any bank and complete the payment to get Premium access it's free for testing.
                           </p>
                         </div>
                       </div>

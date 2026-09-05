@@ -16,6 +16,34 @@ export interface IGame {
   lastFetched?: Date;
   createdAt?: Date;
   updatedAt?: Date;
+  rawgDetails?: {
+    developers?: {
+      id: number;
+      name: string;
+      slug?: string;
+    }[];
+
+    publishers?: {
+      id: number;
+      name: string;
+      slug?: string;
+    }[];
+
+    stores?: {
+      id: number;
+      name: string;
+      slug?: string;
+      url?: string;
+    }[];
+
+    dlc?: {
+      id: number;
+      name: string;
+      slug: string;
+      released?: Date;
+      image?: string;
+    }[];
+  };
 }
 
 const GameSchema = new Schema<IGame>(
@@ -71,6 +99,42 @@ const GameSchema = new Schema<IGame>(
     platforms: {
       type: [String],
       index: true,
+    },
+    rawgDetails: {
+      developers: [
+        {
+          id: Number,
+          name: String,
+          slug: String,
+        },
+      ],
+
+      publishers: [
+        {
+          id: Number,
+          name: String,
+          slug: String,
+        },
+      ],
+
+      stores: [
+        {
+          id: Number,
+          name: String,
+          slug: String,
+          url: String,
+        },
+      ],
+
+      dlc: [
+        {
+          id: Number,
+          name: String,
+          slug: String,
+          released: Date,
+          image: String,
+        },
+      ],
     },
     // Cache timestamp
     lastFetched: {

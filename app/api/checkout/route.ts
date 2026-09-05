@@ -12,7 +12,10 @@ export async function GET(req: NextRequest) {
       );
     }
     await connectToDatabase();
+    const provider = token.provider as "google" | "github";
+
     const user = await User.findOne({
+      
       provider: token.provider,
       providerId: token.providerId,
     });

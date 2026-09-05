@@ -28,11 +28,16 @@ export default function GamePage() {
   const [reviewText, setReviewText] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // Which tab is active inside the premium "Extra Insights" section
+  const [premiumTab, setPremiumTab] = useState<"info" | "dlc">("info");
+
   useEffect(() => {
     fetch(`/api/games/${slug}`)
       .then(res => res.json())
       .then(data => {
+        console.log("stores:", data.game?.rawgDetails?.stores);
         setGame(data.game);
+        console.log("stores:", data.game?.rawgDetails?.stores);
         setReviews(data.reviews);
         setLoading(false);
       });
@@ -167,6 +172,8 @@ if (loading) {
     }
   }
 
+  const dlcList: any[] = game.rawgDetails?.dlc ?? [];
+
   return (
     <>
      
@@ -254,7 +261,153 @@ if (loading) {
           </div>
         </div>
 
-      
+        {/* ---------- PREMIUM SECTION (interactive) ---------- */}
+        {game.rawgDetails && (
+          <div className="mt-10 p-4 sm:p-6 rounded-xl bg-gradient-to-br from-indigo-950/40 to-white/5 border border-indigo-500/30">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                PREMIUM
+              </span>
+              <h3 className="text-lg font-semibold">Extra Insights</h3>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-2 mb-4 border-b border-white/10">
+              <button
+                onClick={() => setPremiumTab("info")}
+                className={cn(
+                  "px-3 py-2 text-sm transition border-b-2",
+                  premiumTab === "info"
+                    ? "border-indigo-500 text-white"
+                    : "border-transparent text-gray-400 hover:text-gray-200"
+                )}
+              >
+                Info
+              </button>
+              <button
+                onClick={() => setPremiumTab("dlc")}
+                className={cn(
+                  "px-3 py-2 text-sm transition border-b-2",
+                  premiumTab === "dlc"
+                    ? "border-indigo-500 text-white"
+                    : "border-transparent text-gray-400 hover:text-gray-200"
+                )}
+              >
+                DLC {dlcList.length > 0 && `(${dlcList.length})`}
+              </button>
+            </div>
+
+            {/* Info tab */}
+            {premiumTab === "info" && (
+              <div>
+                {game.rawgDetails.developers?.length > 0 && (
+                  <p className="text-sm text-gray-300 mb-1">
+                    <span className="text-gray-500">Developers: </span>
+                    {game.rawgDetails.developers.map((d: any) => d.name).join(", ")}
+                  </p>
+                )}
+
+                {game.rawgDetails.publishers?.length > 0 && (
+                  <p className="text-sm text-gray-300 mb-1">
+                    <span className="text-gray-500">Publishers: </span>
+                    {game.rawgDetails.publishers.map((p: any) => p.name).join(", ")}
+                  </p>
+                )}
+
+                {game.rawgDetails.stores?.length > 0 && (
+                  <div className="text-sm text-gray-300 mb-1">
+                    <span className="text-gray-500">Available on: </span>
+                    <span className="inline-flex flex-wrap gap-2 mt-1">
+                      {game.rawgDetails.stores.map((s: any) =>
+                        s.url ? (
+                          <a
+                            key={s.id ?? s.name}
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 transition text-xs"
+                          >
+                            {s.name}
+                          </a>
+                        ) : (
+                          <span
+                            key={s.id ?? s.name}
+                            className="px-2 py-0.5 rounded-full bg-white/10 text-xs"
+                          >
+                            {s.name}
+                          </span>
+                        )
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {!game.rawgDetails.developers?.length &&
+                  !game.rawgDetails.publishers?.length &&
+                  !game.rawgDetails.stores?.length && (
+                    <p className="text-sm text-gray-500">No extra info available.</p>
+                  )}
+              </div>
+            )}
+
+            {/* DLC tab */}
+            {premiumTab === "dlc" && (
+              <div>
+                {dlcList.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {dlcList.map((item: any) => (
+                      <Link
+                        key={item.id ?? item.slug}
+                        href={`/game/${item.slug}`}
+                        className="block rounded-lg overflow-hidden bg-white/5 border border-white/10 hover:border-indigo-500/40 transition cursor-pointer"
+                      >
+                        {item.image && (
+                          <div className="relative w-full h-24">
+                            <Image
+                              src={item.image}
+                              unoptimized
+                              alt={item.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className="p-2">
+                          <p className="text-xs font-medium truncate">{item.name}</p>
+                          {item.released && (
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              {new Date(item.released).toDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No DLC found for this game.</p>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3 mt-5">
+              <Link
+                href={`/game/${slug}/creators`}
+                className="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 transition text-sm font-medium"
+              >
+                See Creators
+              </Link>
+
+              <Link
+                href={`/game/${slug}/reddit`}
+                className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition text-sm font-medium border border-white/10"
+              >
+                See Latest Subreddit Post
+              </Link>
+            </div>
+          </div>
+        )}
+        {/* ---------- END PREMIUM SECTION ---------- */}
+
      {session ? (
   <div className="mt-10 p-4 sm:p-6 rounded-xl bg-white/5 border border-white/10">
     <h3 className="text-lg font-semibold mb-3">Your Rating</h3>

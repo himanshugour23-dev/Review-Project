@@ -64,9 +64,9 @@ export const authOptions: NextAuthOptions = {
     const dbUser = await User.findById(token.userId).select("role").lean();
     token.role = dbUser?.role ?? "user";
   }
-
+      
       if (account) {
-        token.provider = account.provider;
+        token.provider = account.provider as "google" | "github";
         token.providerId = account.providerAccountId;
       }
 

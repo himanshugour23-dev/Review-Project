@@ -41,10 +41,7 @@ export async function GET(req: Request) {
 
     const rawgGames = await searchRawgGames(query);
 
- 
-
-   
-    const cleanedGames = rawgGames
+      const cleanedGames = rawgGames
         .filter((g: any) => g.background_image)
         .sort((a: any, b: any) => b.rating - a.rating)  
         .slice(0, 10)

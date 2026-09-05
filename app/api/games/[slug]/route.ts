@@ -5,7 +5,7 @@ import Review from "@/models/review";
 import User from "@/models/User";
 import ReviewReaction from "@/models/reviewReaction";
 import { getToken } from "next-auth/jwt";
-
+import { getRawgGameDetails, getRawgGameDLC } from "@/lib/rawg";
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -15,8 +15,7 @@ export async function GET(
 
     const { slug } = await params;
 
- 
-    const game = await Game.findOne({ slug }).lean();
+    let game = await Game.findOne({ slug }).lean();
 
     if (!game) {
       return NextResponse.json(
@@ -24,6 +23,7 @@ export async function GET(
         { status: 404 }
       );
     }
+    
 
  
     const reviews = await Review.find({ gameId: game._id })
@@ -37,6 +37,77 @@ export async function GET(
  
     
     const token = await getToken({ req });
+
+    let isPremium = false; 
+
+  if (token?.userId && token?.provider && token?.providerId) {
+  const provider = token.provider as "google" | "github";
+  const user = await User.findOne({provider,providerId: token.providerId,}).lean();
+
+  if (user) {
+    const expiresAt = user.subscription?.expiresAt;
+    isPremium = user.subscription?.isPremium === true && !!expiresAt && expiresAt > new Date();
+  }
+}
+
+ 
+    if (isPremium && !game.rawgDetails) {
+      try {
+        const details = await getRawgGameDetails(game.rawgId);
+
+        const dlc = await getRawgGameDLC(game.rawgId);
+
+        const rawgDetails = {
+          developers:
+            details.developers?.map((developer: any) => ({
+              id: developer.id,
+              name: developer.name,
+              slug: developer.slug,
+            })) ?? [],
+
+          publishers:
+            details.publishers?.map((publisher: any) => ({
+              id: publisher.id,
+              name: publisher.name,
+              slug: publisher.slug,
+            })) ?? [],
+
+          stores:
+            details.stores?.map((store: any) => ({
+              id: store.store?.id,
+              name: store.store?.name,
+              slug: store.store?.slug,
+              url: store.url,
+            })) ?? [],
+
+          dlc:
+            dlc?.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              slug: item.slug,
+              released: item.released
+                ? new Date(item.released)
+                : undefined,
+              image: item.background_image,
+            })) ?? [],
+        };
+
+        game = await Game.findByIdAndUpdate(
+          game._id,
+          {
+            $set: {
+              rawgDetails,
+            },
+          },
+          { new: true }
+        );
+      } catch (rawgError) {
+        console.error(
+          "RAWG details fetch failed:",
+          rawgError
+        );
+      }
+    }
     const userId = token?.userId || null;
     
     const revieewIds = reviews.map(r =>r._id)
@@ -93,3 +164,5 @@ return NextResponse.json({
     );
   }
 }
+
+

@@ -1,5 +1,4 @@
 "use client";
-import RazorpayCheckoutButton from "@/components/RazorpayCheckoutButton";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -150,7 +149,7 @@ export default function ProfilePage() {
 
   return (
     <>
-        <div className="fixed bottom-6 bg-white right-6 z-50"><RazorpayCheckoutButton /></div>
+       
          
       {toast && (
         <div

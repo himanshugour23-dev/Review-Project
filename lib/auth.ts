@@ -4,9 +4,6 @@ import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 
-
-console.log("NEXTAUTH_SECRET length =", process.env.NEXTAUTH_SECRET?.length);
-
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({

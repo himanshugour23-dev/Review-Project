@@ -32,7 +32,7 @@ export default function LoginPage() {
       >
        
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold tracking-wide">VaultggB</h1>
+          <h1 className="text-3xl font-bold tracking-wide">baclogged</h1>
           <p className="text-gray-400 text-sm">
             Rate. Review. Discover the games you love.
           </p>

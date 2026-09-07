@@ -250,6 +250,14 @@ return (
               {/* Navigation */}
               <nav className="space-y-2">
 
+                  <Link
+                      href="/checkoutPageDetails"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-gray-300 transition hover:bg-white/5 hover:text-white"
+                    >
+                      <Library size={18} />
+                      Premium
+                    </Link>
                 <Link
                   href="/discover"
                   onClick={() => setMenuOpen(false)}

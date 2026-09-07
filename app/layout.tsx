@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://baclogged.in"),
 
   title: {
-    default: "Baclogged — Game Reviews & Ratings",
+    default: "Baclogged:Game Reviews & Ratings ",
     template: "%s | Baclogged",
   },
 

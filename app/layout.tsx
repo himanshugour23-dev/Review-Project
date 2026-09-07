@@ -7,7 +7,12 @@ export const metadata = {
   title: "Game Review Hub",
   description: "Game reviews platform",
   manifest: "/manifest.json",
+  icons: {
+    icon : "/icon.png"
+  }
 };
+
+
 
 export default function RootLayout({
   children,

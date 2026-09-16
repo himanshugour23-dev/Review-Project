@@ -1,38 +1,138 @@
-# VaultGG: Game Review & Collection Platform
+# Baclogged: Game Review & Collection Platform
 
-VaultGG is a full-stack, API-first platform built for gamers to discover, rate, review, and track their personal video game collections. Built as a Progressive Web App (PWA), the platform features robust caching mechanisms, role-based moderation, and dynamic catalogs that enrich organically over time.
+Baclogged is a full-stack game review and collection platform where users can discover games, maintain their personal collections, rate and review games, and interact with community content.
+
+The platform integrates the RAWG Video Games Database API with a MongoDB-backed caching layer to reduce redundant external API requests. It also includes role-based authentication, moderation workflows, secure payment processing, database-level constraints, rate limiting, and duplicate-prevention mechanisms.
+
 ## 🚀 Live Demo & Repository
-- **Live Demo:** [vaultgg-b.vercel.app](https://vaultgg-b.vercel.app)
+
+- **Live Demo:** [baclogged.in](https://www.baclogged.in/)
 - **GitHub Repository:** [github.com/himanshugour23-dev/Review-Project](https://github.com/himanshugour23-dev/Review-Project)
+
+---
+
 ## ✨ Features
 
-- **Progressive Web App (PWA):** Fully installable on desktop and mobile devices for a native application experience.
-- **Smart API Caching Layer:** Features an optimized caching framework wrapping around the external **RAWG API**. Fetched game data is persisted into MongoDB to minimize redundant third-party API limits and accelerate repeat search query performance.
-- **Role-Based Access Control (RBAC):** Separate tiers for standard users and administrators. Admins have dedicated moderation tools to enforce platform content guidelines and manage community reviews.
-- **Comprehensive Catalog Management:** Seamless interfaces handling user lists, detailed game metadata, custom ratings, and profile customizations.
-- **Organic Catalog Building:** Designed to grow its local database richness progressively as users interact with, search for, and cache new game data over time.
-- **Atomic comments and Like system Applied on DataBase Level**
-## 🛠️ Tech Stack
-- **Frontend:** React.js, Next.js (App Router), Tailwind CSS
-- **Backend:** Node.js, Next.js API Routes / Server Actions
-- **Authentication:** NextAuth.js (Role-based session management)
-- **Database:** MongoDB (Mongoose ODM)
-- **External API Integrations:** RAWG Video Games Database API
-## 🏗️ Architecture & Database Design
-VaultGG relies on an integrated relational-document hybrid structure within MongoDB to track:
-- **Users & Profiles:** Handles standard credentials and NextAuth session attributes.
-- **Game Cache:** Acts as a mirror for raw third-party data, containing titles, descriptions, genres, and artwork.
-- **User Collections:** Tracks custom user lists (e.g., *Backlog*, *Completed*, *Playing*).
-- **Reviews & Ratings:** Tracks continuous feedback loops provided by platform members.
-## 🏁 Getting Started
-### Prerequisites
-Make sure you have the following installed on your machine:
-- **Node.js** (v18.x or higher recommended)
-- **npm**, **yarn**, **pnpm**, or **bun**
-- A **MongoDB Atlas** URI or a local MongoDB instance
-- A **RAWG API Key** (Get one for free at [rawg.io/apidocs](https://rawg.io/apidocs))
+### 🎮 Game Discovery & Collection
 
-### 1. Clone the Repository
-```bash
-git clone [https://github.com/himanshugour23-dev/Review-Project.git](https://github.com/himanshugour23-dev/Review-Project.git)
-cd Review-Project
+- Browse and discover games using the RAWG Video Games Database API.
+- View detailed game information including metadata, genres, ratings, release information, and artwork.
+- Maintain personal game collections and track games based on their status.
+- Game data is progressively persisted into the local database as users interact with the platform.
+
+### ⚡ API Caching Layer
+
+- Implemented a MongoDB-backed caching layer around the RAWG API.
+- Previously fetched game data is served from the database instead of repeatedly requesting the external API.
+- Reduces redundant third-party API calls and improves response time for repeated searches.
+- Cached records include game metadata and freshness information to control when data should be refreshed.
+
+### 🔐 Authentication & Role-Based Access Control
+
+- Implemented authentication using NextAuth.js.
+- Supports OAuth-based authentication.
+- Added role-based access control for standard users and administrators.
+- Administrators have dedicated moderation capabilities for managing community content.
+
+### 💳 Secure Payment Integration
+
+- Integrated the Razorpay payment gateway.
+- Implemented HMAC-SHA256 signature verification for payment authenticity.
+- Added server-side price validation to prevent client-side price manipulation.
+- Implemented idempotent payment callback handling to prevent duplicate access grants.
+
+### 🛡️ Review & Moderation System
+
+- Users can create ratings and reviews for games.
+- Enforced a one-review-per-user-per-game constraint at the database level.
+- Added review reporting functionality.
+- Implemented an administrative review queue for reported content.
+- Added per-user daily rate limits for reporting actions.
+- Prevented duplicate reports using a unique compound database index.
+- Added moderation controls for administrators to maintain content quality.
+
+### 🗄️ Database-Level Integrity
+
+- Used atomic database operations for critical review-related workflows.
+- Enforced uniqueness constraints to prevent duplicate submissions.
+- Database-level restrictions prevent rating inflation caused by multiple reviews from the same user.
+- Compound indexes are used for efficient queries and duplicate prevention.
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+
+- React.js
+- Next.js
+- Next.js App Router
+- Tailwind CSS
+- Progressive Web App (PWA)
+
+### Backend
+
+- Node.js
+- Next.js API Routes
+- Next.js Server Actions
+- REST APIs
+
+### Authentication
+
+- NextAuth.js
+- OAuth
+- Role-Based Access Control (RBAC)
+
+### Database
+
+- MongoDB
+- Mongoose
+
+### External Services
+
+- RAWG Video Games Database API
+- Razorpay Payment Gateway
+
+### Developer Tools
+
+- Git
+- GitHub
+- Postman
+- Vercel
+
+---
+
+## 🏗️ Architecture & Database Design
+
+Baclogged uses a MongoDB-based architecture with separate collections for users, games, reviews, reports, and user-specific game data.
+
+### 👤 Users & Profiles
+
+Stores user identity, authentication provider information, profile details, roles, and user-specific game preferences.
+
+### 🎮 Game Cache
+
+Stores game information retrieved from the RAWG API.
+
+The cached data contains information such as:
+
+- RAWG Game ID
+- Game name
+- Slug
+- Cover image
+- Genres
+- Release date
+- Average rating
+- Review count
+- Last fetched timestamp
+
+This allows frequently requested games to be served from MongoDB instead of repeatedly querying the RAWG API.
+
+### ⭐ Reviews & Ratings
+
+Reviews are associated with both users and games.
+
+A unique database constraint ensures:
+
+```text
+One user → One review → One game

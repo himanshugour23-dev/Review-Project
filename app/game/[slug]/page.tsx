@@ -23,18 +23,31 @@ export default function GamePage() {
   const [reviewText, setReviewText] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Which tab is active inside the premium "Extra Insights" section
   const [premiumTab, setPremiumTab] = useState<"info" | "dlc">("info");
 
-  useEffect(() => {
-    fetch(`/api/games/${slug}`)
-      .then(res => res.json())
-      .then(data => {
-        setGame(data.game);
-        setReviews(data.reviews ?? []);
+ useEffect(() => {
+  if (!slug) return;
+
+  const controller = new AbortController();
+
+  setLoading(true);
+
+  fetch(`/api/games/${slug}`, { signal: controller.signal })
+    .then(res => res.json())
+    .then(data => {
+      setGame(data.game);
+      setReviews(data.reviews ?? []);
+      setLoading(false);
+    })
+    .catch(err => {
+      if (err.name !== "AbortError") {
+        console.error(err);
         setLoading(false);
-      });
-  }, [slug]);
+      }
+    });
+
+  return () => controller.abort();
+}, [slug]);
 
   useEffect(() => {
     if (session && reviews.length > 0) {

@@ -3,26 +3,22 @@ import { connectToDatabase } from "@/lib/db";
 import { getToken } from "next-auth/jwt";
 import User from "@/models/User";
 import { NextResponse, NextRequest } from "next/server";
+import {avatarModration} from "@/lib/avatarModration";
 
 export async function POST(req: NextRequest) {
   try {
     const token = await getToken({ req });
-
     if (!token?.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-
     if (!file) {
       return NextResponse.json({ error: "No file received" }, { status: 400 });
     }
-
     if (!file.type.startsWith("image/")) {
       return NextResponse.json({ error: "Only images allowed" }, { status: 400 });
     }
-
     if (file.size > 2 * 1024 * 1024) {
       return NextResponse.json(
         { error: "Image must be under 2MB" },
@@ -31,7 +27,10 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-
+    const allowed = await avatarModration(buffer, file.type);
+    if (!allowed) {
+      return NextResponse.json({ error: "Image not allowed as avatar It may contain Nudity or Sexually explicit content " }, { status: 400 });
+    }
     await connectToDatabase();
 
     const user = await User.findById(token.userId);

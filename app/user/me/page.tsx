@@ -70,7 +70,7 @@ export default function ProfilePage() {
   const handleAvatarUpload = async (file: File) => {
     try {
       setAvatarLoading(true);
-      setToast({ type: "success", msg: "Uploading avatar..." });
+      setToast({ type: "success", msg: "Please Wait While We check for Modrations . It may take Few Momments " });
 
       const formData = new FormData();
       formData.append("file", file);

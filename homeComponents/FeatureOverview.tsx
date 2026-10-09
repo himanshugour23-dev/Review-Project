@@ -1,111 +1,208 @@
+
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 
 const features = [
   {
-    title: 'Track your personal game collection',
+    number: '01',
+    eyebrow: 'YOUR COLLECTION',
+    title: 'Every game has a place.',
     description:
-      "Track every game you've played, are currently playing, or want to play. baclogged helps you stay organized and build your personal gaming library effortlessly.",
+      "Keep track of the games you've played, the ones you're playing now, and the adventures waiting in your backlog. Build a gaming library that feels like yours.",
     image: '/774617.png',
-    alt: 'Track your collection',
+    alt: 'Gaming collection',
+    tag: 'Organize your library',
+    layout: 'large',
   },
   {
-    title: 'Express your thoughts with reviews',
+    number: '02',
+    eyebrow: 'YOUR OPINION',
+    title: 'Play it. Feel it. Review it.',
     description:
-      'Share your experience, rate games, and write meaningful reviews. Help others discover what is worth playing while building your own gaming profile.',
+      'Rate your experiences, put your thoughts into words, and create a record of the games that made an impression on you.',
     image: '/1123.jpg',
-    alt: 'Review games',
+    alt: 'Game reviews',
+    tag: 'Share your perspective',
+    layout: 'small',
   },
   {
-    title: 'Keep up with the latest from friends',
+    number: '03',
+    eyebrow: 'DISCOVER SOMETHING NEW',
+    title: 'Your next favourite is out there.',
     description:
-      'See what your friends are playing, discover new reviews, and explore curated lists of games from people you follow.',
+      'Explore the available game catalogue, browse titles you have not played, and find your next adventure.',
     image: '/23456.jpg',
-    alt: 'Friend activity',
+    alt: 'Discover new games',
+    tag: 'Explore the catalogue',
+    layout: 'small',
+  },
+  {
+    number: '04',
+    eyebrow: 'THE BIG PICTURE',
+    title: 'Get to know the game.',
+    description:
+      'Explore individual game pages to learn more about titles before deciding which ones deserve a place in your collection.',
+    image: '/774617.png',
+    alt: 'Game artwork and details',
+    tag: 'Explore game pages',
+    layout: 'large',
+  },
+  {
+    number: '05',
+    eyebrow: 'YOUR NEXT SESSION',
+    title: 'Keep your backlog in sight.',
+    description:
+      'Keep the games you want to play on your radar and make it easier to decide what to play next.',
+    image: '/1123.jpg',
+    alt: 'Games waiting to be played',
+    tag: 'Find your next game',
+    layout: 'small',
+  },
+  {
+    number: '06',
+    eyebrow: 'GAMING, SHARED',
+    title: 'Good games spark conversations.',
+    description:
+      'Use reviews and community features to share opinions, find other perspectives, and discover games through the experiences of other players.',
+    image: '/23456.jpg',
+    alt: 'Gaming community and reviews',
+    tag: 'Explore player perspectives',
+    layout: 'small',
   },
 ];
 
 export default function FeatureOverview() {
   return (
-    <section className="relative overflow-hidden border-t border-white/10 bg-black py-24 text-white">
-      {/* Background Glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_55%)]" />
+    <section
+      id="baclogged-features"
+      className="relative overflow-hidden border-t border-white/[0.08] bg-[#08090c] py-20 text-white sm:py-28"
+    >
+      {/* Decorative background */}
+      <div className="pointer-events-none absolute -left-40 top-40 h-96 w-96 rounded-full bg-lime-300/[0.04] blur-[100px]" />
+      <div className="pointer-events-none absolute -right-40 bottom-20 h-96 w-96 rounded-full bg-emerald-400/[0.035] blur-[100px]" />
 
-      <div className="relative mx-auto max-w-7xl px-5 sm:px-6">
-        <div className="mb-16 text-center">
-          <p className="text-[11px] font-bold uppercase tracking-[0.35em] text-blue-400">
-            Why baclogged
-          </p>
+      <div className="relative mx-auto max-w-[1440px] px-5 sm:px-10 lg:px-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="mb-12 max-w-3xl sm:mb-16"
+        >
+          <div className="flex items-center gap-3">
+            <span className="h-px w-8 bg-lime-300" />
+            <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-lime-300 sm:text-xs">
+              Built around your gaming life
+            </p>
+          </div>
 
-          <h2 className="mt-4 text-4xl font-black sm:text-5xl">
-            Everything a Gamer Needs
+          <h2 className="mt-6 text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
+            More than a list.
+            <br />
+            <span className="text-white/35">A life in games.</span>
           </h2>
 
-          <p className="mx-auto mt-6 max-w-2xl text-gray-400 leading-8">
-            Organize your library, share your opinions, and discover great games
-            through a clean, modern experience built for players.
+          <p className="mt-6 max-w-2xl text-sm leading-7 text-white/50 sm:text-base sm:leading-8">
+            baclogged brings your collection, reviews, discovery, and
+            gaming experiences together in one place. Spend less time
+            figuring out what to play and more time playing.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="space-y-28">
+        {/* Editorial feature grid */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature, index) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, y: 35 }}
+            <motion.article
+              key={feature.number}
+              initial={{ opacity: 0, y: 22 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.55 }}
-              className={`grid items-center gap-10 lg:gap-16 md:grid-cols-2
-                ${
-                  index % 2 === 1
-                    ? 'md:[&>*:first-child]:order-2'
-                    : ''
-                }
-              `}
+              viewport={{ once: true, amount: 0.12 }}
+              transition={{ duration: 0.45, delay: (index % 3) * 0.07 }}
+              className={`group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#101116] transition-colors duration-300 hover:border-lime-300/30 ${
+                feature.layout === 'large' ? 'lg:col-span-2' : ''
+              }`}
             >
-
-              <div className="group">
-                <div
-                  className=" relative aspect-[16/10] overflow-hidden rounded-xl  bg-zinc-900 shadow-2xl ring-1  ring-white/10 transition-all duration-500  group-hover:ring-blue-500/40
-                  "
-                >
+              <Link
+                href="/browse"
+                aria-label={`${feature.title} — browse games`}
+                className="block h-full"
+              >
+                <div className="relative aspect-[16/9] overflow-hidden bg-[#17181d]">
                   <Image
                     src={feature.image}
                     alt={feature.alt}
                     fill
                     unoptimized
-                    className=" object-cover transition-transform duration-700 group-hover:scale-105
-                    "
-                    sizes="(max-width:768px)100vw,50vw"
+                    sizes={
+                      feature.layout === 'large'
+                        ? '(max-width: 1024px) 100vw, 66vw'
+                        : '(max-width: 640px) 100vw, 33vw'
+                    }
+                    className="object-cover opacity-70 transition duration-700 group-hover:scale-105 group-hover:opacity-90"
                   />
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                </div>
-              </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#101116] via-black/10 to-transparent" />
 
+                  <span className="absolute left-5 top-5 rounded-full border border-white/15 bg-black/40 px-3 py-1.5 text-[10px] font-semibold tracking-[0.2em] text-white/75 backdrop-blur-md">
+                    {feature.number}
+                  </span>
 
-              <div className="max-w-xl">
-                <div className="mb-5 h-px w-16 bg-blue-500" />
-
-                <h3 className="text-3xl font-bold leading-tight sm:text-4xl">
-                  {feature.title}
-                </h3>
-
-                <p className="mt-6 text-base leading-8 text-gray-400">
-                  {feature.description}
-                </p>
-
-                <div className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-blue-400">
-                  Learn More
-                  <span className="transition-transform group-hover:translate-x-1">
-                    →
+                  <span className="absolute bottom-5 right-5 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/30 text-lg text-white transition group-hover:border-lime-300 group-hover:bg-lime-300 group-hover:text-black">
+                    ↗
                   </span>
                 </div>
-              </div>
-            </motion.div>
+
+                <div className="p-6 pt-2 sm:p-7 sm:pt-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-lime-300">
+                    {feature.eyebrow}
+                  </p>
+
+                  <h3 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
+                    {feature.title}
+                  </h3>
+
+                  <p className="mt-4 text-sm leading-7 text-white/45">
+                    {feature.description}
+                  </p>
+
+                  <div className="mt-6 flex items-center justify-between gap-3 border-t border-white/[0.08] pt-4">
+                    <span className="text-xs font-semibold text-white/65">
+                      {feature.tag}
+                    </span>
+                    <span className="text-sm text-lime-300 transition-transform group-hover:translate-x-1">
+                      →
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            </motion.article>
           ))}
+        </div>
+
+        {/* Final call to action */}
+        <div className="mt-12 flex flex-col items-start justify-between gap-6 rounded-2xl border border-lime-300/15 bg-lime-300/[0.035] p-7 sm:flex-row sm:items-center sm:p-10">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-lime-300">
+              Ready when you are
+            </p>
+            <h3 className="mt-3 text-2xl font-black sm:text-3xl">
+              There is always another game.
+            </h3>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-white/45">
+              Start exploring the catalogue and find something worth
+              adding to your story.
+            </p>
+          </div>
+
+          <Link
+            href="/browse"
+            className="inline-flex shrink-0 items-center gap-3 rounded-full bg-lime-300 px-6 py-3.5 text-sm font-bold text-black transition hover:bg-lime-200"
+          >
+            Explore games <span>↗</span>
+          </Link>
         </div>
       </div>
     </section>

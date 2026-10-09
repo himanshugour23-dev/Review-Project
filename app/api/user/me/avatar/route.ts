@@ -3,7 +3,7 @@ import { connectToDatabase } from "@/lib/db";
 import { getToken } from "next-auth/jwt";
 import User from "@/models/User";
 import { NextResponse, NextRequest } from "next/server";
-import {avatarModration} from "@/lib/avatarModration";
+import { avatarModration, ModerationUnavailableError } from "@/lib/avatarModration";
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,18 +27,27 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const allowed = await avatarModration(buffer, file.type);
+
+    let allowed: boolean;
+    try {
+      allowed = await avatarModration(buffer, file.type);
+    } catch (err) {
+      if (err instanceof ModerationUnavailableError) {
+        return NextResponse.json(
+          { error: "Image check is busy right now. Please try again in a minute." },
+          { status: 503 }
+        );
+      }
+      throw err;
+    }
     if (!allowed) {
       return NextResponse.json({ error: "Image not allowed as avatar It may contain Nudity or Sexually explicit content " }, { status: 400 });
     }
     await connectToDatabase();
-
     const user = await User.findById(token.userId);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-
-    // Upload to Cloudinary FIRST
     const uploadResult: any = await new Promise((resolve, reject) => {
       cloudinary.uploader
         .upload_stream(
@@ -46,6 +55,8 @@ export async function POST(req: NextRequest) {
             folder: `avatars/${token.userId}`,
             resource_type: "image",
             format: "webp", 
+            moderation: "aws_rek",
+            notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/cloudinary-webhook`,
             transformation: [
               {
                 width: 300,
@@ -68,6 +79,14 @@ export async function POST(req: NextRequest) {
 
     if (!uploadResult?.secure_url || !uploadResult?.public_id) {
       throw new Error("Cloudinary returned invalid upload result");
+    }
+
+    if (uploadResult.moderation?.[0]?.status === "rejected") {
+      await cloudinary.uploader.destroy(uploadResult.public_id);
+      return NextResponse.json(
+        { error: "Image not allowed as avatar" },
+        { status: 400 }
+      );
     }
 
 

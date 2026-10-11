@@ -1,130 +1,194 @@
 "use client";
 
-import toast from "react-hot-toast";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import {BarChart,Bar,XAxis,YAxis,ResponsiveContainer,} from "recharts";
+import toast from "react-hot-toast";
+import Rating from "@mui/material/Rating";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  CalendarDays,
+  Check,
+  CircleHelp,
+  ExternalLink,
+  Gamepad2,
+  Heart,
+  MessageCircle,
+  Send,
+  Sparkles,
+  Star,
+  ThumbsDown,
+  ThumbsUp,
+  Trophy,
+  UserRound,
+} from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
 import { cn } from "@/lib/utils";
 import SleepLoader from "@/components/SleepLoader";
-import Rating from "@mui/material/Rating";
-import Stack from "@mui/material/Stack";
-import { styled } from "@mui/material/styles";
+
+type PremiumTab = "info" | "dlc";
+
+interface GamePageData {
+  _id: string;
+  name: string;
+  slug: string;
+  coverImage: string;
+  released?: string;
+  metacritic?: number;
+  averageRating?: number;
+  genres?: string[];
+  platforms?: string[];
+  rawgDetails?: {
+    developers?: { name: string }[];
+    publishers?: { name: string }[];
+    stores?: { id?: string | number; name: string; url?: string }[];
+    dlc?: {
+      id?: string | number;
+      slug: string;
+      name: string;
+      image?: string;
+      released?: string;
+    }[];
+  };
+  [key: string]: any;
+}
+
+interface ReviewData {
+  _id: string;
+  userId: {
+    _id: string;
+    name: string;
+    avatar?: string;
+  };
+  rating: number;
+  reviewText?: string;
+  likes?: number;
+  dislikes?: number;
+  reaction?: "like" | "dislike" | null;
+  [key: string]: any;
+}
+
+const formatDate = (value?: string) => {
+  if (!value) return "Release date unknown";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "Release date unknown"
+    : date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+};
+
+const initials = (name?: string) =>
+  (name || "Player")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 
 export default function GamePage() {
-  const { slug } = useParams<{ slug: string }>();
+  const params = useParams<{ slug: string }>();
+  const slug = params?.slug;
   const { data: session } = useSession();
 
-  const [game, setGame] = useState<any>(null);
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [game, setGame] = useState<GamePageData | null>(null);
+  const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [rating, setRating] = useState<number | null>(null);
   const [reviewText, setReviewText] = useState("");
   const [loading, setLoading] = useState(true);
-
-  const [premiumTab, setPremiumTab] = useState<"info" | "dlc">("info");
-
- useEffect(() => {
-  if (!slug) return;
-
-  const controller = new AbortController();
-
-  setLoading(true);
-
-  fetch(`/api/games/${slug}`, { signal: controller.signal })
-    .then(res => res.json())
-    .then(data => {
-      setGame(data.game);
-      setReviews(data.reviews ?? []);
-      setLoading(false);
-    })
-    .catch(err => {
-      if (err.name !== "AbortError") {
-        console.error(err);
-        setLoading(false);
-      }
-    });
-
-  return () => controller.abort();
-}, [slug]);
+  const [premiumTab, setPremiumTab] = useState<PremiumTab>("info");
 
   useEffect(() => {
-    if (session && reviews.length > 0) {
-      const existingReview = reviews.find(
-        r => r.userId._id === session.user.id
-      );
+    if (!slug) return;
 
-      if (existingReview) {
-        setRating(existingReview.rating);
-        setReviewText(existingReview.reviewText ?? "");
-      }
+    const controller = new AbortController();
+    setLoading(true);
+
+    fetch(`/api/games/${slug}`, { signal: controller.signal, cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Unable to load this game.");
+        return res.json();
+      })
+      .then((data) => {
+        setGame(data?.game ?? null);
+        setReviews(data?.reviews ?? []);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error(error);
+          toast.error("Could not load this game.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [slug]);
+
+  useEffect(() => {
+    if (!session?.user?.id || reviews.length === 0) return;
+
+    const existingReview = reviews.find(
+      (review) => review.userId?._id === session.user.id,
+    );
+
+    if (existingReview) {
+      setRating(existingReview.rating);
+      setReviewText(existingReview.reviewText ?? "");
     }
   }, [session, reviews]);
-
-  const DarkRating = styled(Rating)({
-    "& .MuiRating-iconEmpty": {
-      color: "#27272a",
-    },
-    "& .MuiRating-iconFilled": {
-      color: "#facc15",
-    },
-    "& .MuiRating-iconHover": {
-      color: "#fde047",
-    },
-  });
-
-  function StarRating({value,onChange}: {
-    value: number | null;
-    onChange: (v: number) => void;
-  }) {
-    return (
-      <Stack spacing={1}>
-        <DarkRating
-          value={value}
-          precision={0.5}
-          size="large"
-          onChange={(e, v) => {
-            if (v !== null) onChange(v);
-          }}
-        />
-      </Stack>
-    );
-  }
 
   const addToFavourite = async () => {
     if (!session) {
       toast.error("Login required");
       return;
     }
+    if (!game) return;
 
-    const res = await fetch("/api/user/me/favourite/add", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gameId: game._id }),
-    });
-
-    if (res.ok) toast.success("Added to favourites");
-    else toast.error("Failed to add favourite");
+    try {
+      const res = await fetch("/api/user/me/favourite/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId: game._id }),
+      });
+      if (res.ok) toast.success("Added to favourites");
+      else toast.error("Failed to add favourite");
+    } catch {
+      toast.error("Network error while adding favourite");
+    }
   };
 
   const submitReview = async () => {
+    if (!session) {
+      toast.error("Login required");
+      return;
+    }
+    if (!game) return;
     if (!rating) {
-      toast.error("Select rating first");
+      toast.error("Select a rating first");
       return;
     }
 
-    const toastId = toast.loading("Submitting...");
-
+    const toastId = toast.loading("Submitting your review...");
     try {
       const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          gameId: game._id,
-          rating,
-          reviewText,
-        }),
+        body: JSON.stringify({ gameId: game._id, rating, reviewText }),
       });
 
       if (!res.ok) {
@@ -132,66 +196,71 @@ export default function GamePage() {
         return;
       }
 
-      const updated = await fetch(`/api/games/${slug}`).then(r => r.json());
+      const updatedResponse = await fetch(`/api/games/${slug}`, {
+        cache: "no-store",
+      });
+      if (!updatedResponse.ok) throw new Error("Could not refresh reviews.");
+      const updated = await updatedResponse.json();
 
-      setReviews(updated.reviews ?? []);
-      setGame(updated.game);
-
+      setReviews(updated?.reviews ?? []);
+      setGame(updated?.game ?? game);
       setReviewText("");
       setRating(null);
-
       toast.success("Review submitted!", { id: toastId });
     } catch {
       toast.error("Network error", { id: toastId });
     }
   };
 
-  const reactToReview = async (
-    reviewId: string,
-    type: "like" | "dislike"
-  ) => {
+  const reactToReview = async (reviewId: string, type: "like" | "dislike") => {
     if (!session) {
       toast.error("Login required to react");
       return;
     }
 
-    setReviews(prev =>
-      prev.map(review => {
+    setReviews((current) =>
+      current.map((review) => {
         if (review._id !== reviewId) return review;
 
         if (type === "like") {
+          const removingLike = review.reaction === "like";
           return {
-            ...review,reaction: review.reaction === "like" ? null : "like",likes:
-              review.reaction === "like"
-                ? Math.max((review.likes || 1) - 1, 0)
-                : (review.likes || 0) + 1,
-            dislikes:
-              review.reaction === "dislike"
-                ? Math.max((review.dislikes || 1) - 1, 0)
-                : review.dislikes || 0,
+            ...review,
+            reaction: removingLike ? null : "like",
+            likes: Math.max((review.likes || 0) + (removingLike ? -1 : 1), 0),
+            dislikes: Math.max(
+              (review.dislikes || 0) - (review.reaction === "dislike" ? 1 : 0),
+              0,
+            ),
           };
         }
 
+        const removingDislike = review.reaction === "dislike";
         return {
           ...review,
-          reaction: review.reaction === "dislike" ? null : "dislike",
-          dislikes:
-            review.reaction === "dislike"
-              ? Math.max((review.dislikes || 1) - 1, 0)
-              : (review.dislikes || 0) + 1,
-          likes:
-            review.reaction === "like"
-              ? Math.max((review.likes || 1) - 1, 0)
-              : review.likes || 0,
+          reaction: removingDislike ? null : "dislike",
+          dislikes: Math.max(
+            (review.dislikes || 0) + (removingDislike ? -1 : 1),
+            0,
+          ),
+          likes: Math.max(
+            (review.likes || 0) - (review.reaction === "like" ? 1 : 0),
+            0,
+          ),
         };
-      })
+      }),
     );
 
-    await fetch("/api/reactions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reviewId, type }),
-    });
+    try {
+      const res = await fetch("/api/reactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewId, type }),
+      });
+      if (!res.ok) toast.error("Could not save reaction");
+    } catch {
+      toast.error("Could not save reaction");
+    }
   };
 
   const reportReview = async (reviewId: string) => {
@@ -204,349 +273,330 @@ export default function GamePage() {
       const res = await fetch("/api/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reviewId,
-          reason: "Inappropriate content",
-        }),
+        body: JSON.stringify({ reviewId, reason: "Inappropriate content" }),
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Report failed");
-      }
-
+      if (!res.ok) throw new Error(data?.error || "Report failed");
       toast.success("Review reported");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to report review");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to report review");
     }
   };
 
+  const ratingData = useMemo(() => {
+    const buckets = [0, 0, 0, 0, 0];
+    reviews.forEach((review) => {
+      const index = Math.floor(Number(review.rating)) - 1;
+      if (index >= 0 && index < buckets.length) buckets[index] += 1;
+    });
+    return buckets.map((count, index) => ({ star: `${index + 1}`, count }));
+  }, [reviews]);
+
+  const orderedReviews = useMemo(() => {
+    const ordered = [...reviews];
+    if (session?.user?.id) {
+      const index = ordered.findIndex(
+        (review) => review.userId?._id === session.user.id,
+      );
+      if (index > -1) ordered.unshift(...ordered.splice(index, 1));
+    }
+    return ordered;
+  }, [reviews, session]);
+
+  const writtenReviews = orderedReviews.filter(
+    (review) => review.reviewText && review.reviewText.trim().length > 0,
+  );
+  const ownReviewExists = reviews.some(
+    (review) => review.userId?._id === session?.user?.id,
+  );
+  const dlcList = game?.rawgDetails?.dlc ?? [];
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black">
+      <div className="flex min-h-screen items-center justify-center bg-[#08090c]">
         <SleepLoader />
       </div>
     );
   }
 
-  const ratingBuckets = [0, 0, 0, 0, 0];
-
-  reviews.forEach(r => {
-    const idx = Math.floor(r.rating) - 1;
-    if (idx >= 0 && idx < 5) ratingBuckets[idx]++;
-  });
-
-  const ratingData = ratingBuckets.map((count, i) => ({
-    star: `${i + 1}`,
-    count,
-  }));
-
-  let orderedReviews = [...reviews];
-
-  if (session) {
-    const idx = orderedReviews.findIndex(
-      r => r.userId._id === session.user.id
+  if (!game) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#08090c] px-6 text-white">
+        <div className="max-w-md text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-[#d9ff70]/20 bg-[#d9ff70]/5 text-[#d9ff70]">
+            <CircleHelp size={28} />
+          </div>
+          <p className="mt-6 text-xs font-bold uppercase tracking-[0.3em] text-[#d9ff70]">
+            Lost in the backlog
+          </p>
+          <h1 className="mt-3 text-3xl font-black tracking-tight">Game not found.</h1>
+          <p className="mt-3 text-sm leading-6 text-white/50">
+            This page may have moved, or the game is no longer available.
+          </p>
+          <Link
+            href="/discover"
+            className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#d9ff70] px-5 py-3 text-sm font-bold text-[#08090c] transition hover:bg-white"
+          >
+            <ArrowLeft size={16} /> Back to discovery
+          </Link>
+        </div>
+      </main>
     );
-
-    if (idx > -1) {
-      const [userReview] = orderedReviews.splice(idx, 1);
-      orderedReviews.unshift(userReview);
-    }
   }
 
-  const writtenReviews = orderedReviews.filter(
-    r => r.reviewText && r.reviewText.trim().length > 0
-  );
-
-  const ownReviewExists = reviews.some(
-    r => r.userId._id === session?.user.id
-  );
-
-  const dlcList: any[] = game.rawgDetails?.dlc ?? [];
-
   return (
-    <>
-
-      <div className="relative h-[45vh] sm:h-[72vh] w-full overflow-hidden">
-        <Image
-          src={game.coverImage}
-          unoptimized
-          alt={game.name}
-          fill
-          priority
-          className="object-cover object-center brightness-[0.45]"
-        />
-
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/20" />
-      </div>
-
-      <main className="relative -mt-24 sm:-mt-32 max-w-6xl mx-auto px-4 sm:px-6 pb-20 text-white">
-   
-        <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-7 sm:gap-9 items-start">
-          <div className="relative mx-auto md:mx-0 w-full max-w-[260px]">
-            <div className="absolute -inset-1 rounded-2xl bg-indigo-500/10 blur-xl" />
+    <div className="min-h-screen overflow-hidden bg-[#08090c] text-white selection:bg-[#d9ff70] selection:text-[#08090c]">
+      {/* Cinematic cover / editorial masthead */}
+      <section className="relative isolate min-h-[520px] overflow-hidden sm:min-h-[620px]">
+        <div className="absolute inset-0 -z-20">
+          {game.coverImage ? (
             <Image
               src={game.coverImage}
+              alt={`${game.name} artwork`}
+              fill
+              priority
               unoptimized
-              alt={game.name}
-              width={300}
-              height={280}
-              className="relative w-full aspect-[3/4] object-cover rounded-2xl shadow-2xl ring-1 ring-white/10"
+              sizes="100vw"
+              className="object-cover object-center opacity-55 blur-[1px]"
             />
+          ) : null}
+        </div>
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,#08090c_0%,rgba(8,9,12,.9)_32%,rgba(8,9,12,.36)_75%,rgba(8,9,12,.62)_100%)]" />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(0deg,#08090c_0%,rgba(8,9,12,.15)_65%,rgba(8,9,12,.55)_100%)]" />
+        <div className="pointer-events-none absolute inset-0 -z-10 opacity-[0.12] [background-image:linear-gradient(rgba(255,255,255,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.18)_1px,transparent_1px)] [background-size:52px_52px]" />
+        <div className="absolute right-[-8rem] top-16 -z-10 h-72 w-72 rounded-full bg-[#d9ff70]/10 blur-[100px]" />
+
+        <div className="mx-auto flex min-h-[520px] max-w-[1400px] flex-col justify-between px-5 pb-24 pt-28 sm:min-h-[620px] sm:px-8 sm:pb-32 lg:px-12">
+          <div className="flex items-center justify-between gap-4">
+            <Link
+              href="/discover"
+              className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/55 transition hover:text-[#d9ff70]"
+            >
+              <ArrowLeft size={15} /> Back to the wild
+            </Link>
+            <span className="hidden items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-white/45 backdrop-blur-md sm:inline-flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#d9ff70] shadow-[0_0_12px_#d9ff70]" />
+              Player archive / 001
+            </span>
           </div>
 
-          <div className="min-w-0 pt-1 sm:pt-4">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className="px-2.5 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/20 text-[11px] font-medium text-indigo-300">
-                GAME
-              </span>
-
-              {game.metacritic && (
-                <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-gray-400">
-                  Metacritic {game.metacritic}
+          <div className="grid items-end gap-10 md:grid-cols-[minmax(0,1fr)_190px] lg:grid-cols-[minmax(0,1fr)_230px]">
+            <div className="max-w-4xl">
+              <div className="mb-5 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full border border-[#d9ff70]/25 bg-[#d9ff70]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#d9ff70]">
+                  <Gamepad2 size={13} /> Game file
                 </span>
-              )}
-            </div>
-
-            <h1 className="text-3xl sm:text-5xl font-bold tracking-tight leading-tight">
-              {game.name}
-            </h1>
-
-            <p className="mt-2 text-sm sm:text-base text-gray-400">
-              Released {new Date(game.released).toDateString()}
-            </p>
-
-   
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-5 max-w-2xl">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.045] px-5 py-4 min-w-[170px]">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-gray-500">
-                  Community rating
-                </p>
-
-                <div className="flex items-end gap-2 mt-2">
-                  <span className="text-4xl font-bold text-white">
-                    {game.averageRating?.toFixed(1) || "0.0"}
+                {game.metacritic !== undefined && game.metacritic !== null && (
+                  <span className="rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-white/70 backdrop-blur-md">
+                    Metacritic <span className="ml-1 text-white">{game.metacritic}</span>
                   </span>
-                  <span className="text-yellow-400 text-xl mb-1">★</span>
-                </div>
-
-                <p className="text-xs text-gray-500 mt-1">
-                  {reviews.length} {reviews.length === 1 ? "rating" : "ratings"}
-                </p>
+                )}
               </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 min-w-0">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-gray-500 mb-1">
-                  Rating distribution
-                </p>
-
-                <div className="h-24 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={ratingData}>
-                      <XAxis
-                        dataKey="star"
-                        tick={{ fill: "#71717a", fontSize: 10 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis hide />
-                      <Bar
-                        dataKey="count"
-                        radius={[5, 5, 2, 2]}
-                        fill="#6366f1"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.4em] text-white/40">
+                The next chapter is yours
+              </p>
+              <h1 className="max-w-5xl text-5xl font-black leading-[0.94] tracking-[-0.055em] sm:text-6xl md:text-7xl lg:text-[6.5rem]">
+                {game.name}
+                <span className="text-[#d9ff70]">.</span>
+              </h1>
+              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/55">
+                <span className="inline-flex items-center gap-2">
+                  <CalendarDays size={15} className="text-[#d9ff70]" />
+                  {formatDate(game.released)}
+                </span>
+                <span className="hidden h-1 w-1 rounded-full bg-white/25 sm:block" />
+                <span className="inline-flex items-center gap-2">
+                  <Sparkles size={15} className="text-[#d9ff70]" />
+                  {game.genres?.length ? game.genres.join(" / ") : "Genre unknown"}
+                </span>
               </div>
             </div>
 
-          
-            <div className="mt-5 flex flex-wrap gap-2">
-              {game.genres?.map((g: string) => (
-                <span
-                  key={g}
-                  className="px-3 py-1.5 text-xs rounded-full bg-white/[0.06] border border-white/10 text-gray-300"
-                >
-                  {g}
+            <div className="hidden md:block">
+              <div className="relative mx-auto w-full max-w-[230px] rotate-[2deg] transition duration-500 hover:rotate-0">
+                <div className="absolute -inset-2 rounded-[5px] border border-[#d9ff70]/30" />
+                <div className="relative aspect-[3/4] overflow-hidden rounded-[3px] bg-[#17181e] shadow-[0_24px_80px_rgba(0,0,0,.65)]">
+                  {game.coverImage ? (
+                    <Image
+                      src={game.coverImage}
+                      alt={game.name}
+                      fill
+                      unoptimized
+                      sizes="230px"
+                      className="object-cover transition duration-700 hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-white/20"><Gamepad2 size={42} /></div>
+                  )}
+                </div>
+                <div className="mt-4 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.24em] text-white/35">
+                  <span>BACLOGGED FILE</span><span>№ 01</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d9ff70]/35 to-transparent" />
+      </section>
+
+      <main className="relative mx-auto -mt-10 max-w-[1400px] px-5 pb-24 sm:px-8 lg:px-12">
+        {/* The game dossier */}
+        <section className="grid gap-4 lg:grid-cols-[1.05fr_.95fr]">
+          <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.09] bg-[#101116] p-6 sm:p-8">
+            <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[#d9ff70]/[0.07] blur-[80px]" />
+            <div className="relative flex items-start justify-between gap-5">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#d9ff70]">01 / The pulse</p>
+                <h2 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">What players think.</h2>
+                <p className="mt-2 max-w-sm text-sm leading-6 text-white/45">A score made from real player ratings, not just marketing noise.</p>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#d9ff70]/20 bg-[#d9ff70]/[0.08] text-[#d9ff70]">
+                <Trophy size={19} />
+              </div>
+            </div>
+            <div className="relative mt-8 flex flex-wrap items-end gap-x-5 gap-y-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-6xl font-black leading-none tracking-[-0.07em] text-white sm:text-7xl">
+                  {Number(game.averageRating || 0).toFixed(1)}
                 </span>
+                <span className="text-lg text-[#d9ff70]">/ 5</span>
+              </div>
+              <div className="pb-1">
+                <div className="flex items-center gap-1 text-[#d9ff70]">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <Star key={index} size={13} fill={index < Math.round(Number(game.averageRating || 0)) ? "currentColor" : "none"} className={index < Math.round(Number(game.averageRating || 0)) ? "" : "text-white/20"} />
+                  ))}
+                </div>
+                <p className="mt-1 text-xs text-white/40">{reviews.length} {reviews.length === 1 ? "rating" : "ratings"} logged</p>
+              </div>
+            </div>
+            <div className="mt-8 flex flex-wrap gap-2">
+              {(game.genres ?? []).map((genre: string) => (
+                <span key={genre} className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-medium text-white/65 transition hover:border-[#d9ff70]/30 hover:text-[#d9ff70]">{genre}</span>
               ))}
             </div>
-
-            <div className="mt-4 text-sm text-gray-500 leading-6">
-              <span className="text-gray-400">Platforms:</span>{" "}
-              {game.platforms?.join(", ")}
+            <div className="mt-7 border-t border-white/[0.08] pt-5">
+              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/35">Available worlds</p>
+              <p className="mt-2 text-sm leading-6 text-white/65">{game.platforms?.length ? game.platforms.join(" · ") : "Platform information unavailable"}</p>
             </div>
-
             {session && (
               <button
+                type="button"
                 onClick={addToFavourite}
-                className="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/10 border border-white/10 hover:border-white/20 transition text-sm"
+                className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#d9ff70]/25 bg-[#d9ff70]/[0.08] px-4 py-2.5 text-xs font-bold text-[#d9ff70] transition hover:bg-[#d9ff70] hover:text-[#08090c]"
               >
-                <span>♥</span>
-                Add to Favourites
+                <Heart size={15} /> Add to favourites <ArrowUpRight size={13} />
               </button>
             )}
           </div>
-        </div>
 
+          <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.09] bg-[#101116] p-6 sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#d9ff70]">02 / The numbers</p>
+                <h2 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">Rating breakdown.</h2>
+                <p className="mt-2 text-sm text-white/45">Every star tells a different story.</p>
+              </div>
+              <span className="font-mono text-xs text-white/25">1 — 5 ★</span>
+            </div>
+            <div className="mt-5 h-[210px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={ratingData} margin={{ top: 10, right: 4, left: -24, bottom: 0 }}>
+                  <XAxis dataKey="star" tick={{ fill: "#777b82", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `${value}★`} />
+                  <YAxis hide allowDecimals={false} />
+                  <Tooltip
+                    cursor={{ fill: "rgba(217,255,112,.05)" }}
+                    contentStyle={{ background: "#17181e", border: "1px solid rgba(217,255,112,.2)", borderRadius: 12, color: "#fff", fontSize: 12 }}
+                    labelFormatter={(value) => `${value} star${value === "1" ? "" : "s"}`}
+                    formatter={(value) => [`${value} rating${Number(value) === 1 ? "" : "s"}`, "Players"]}
+                  />
+                  <Bar dataKey="count" fill="#d9ff70" radius={[7, 7, 2, 2]} maxBarSize={38} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex items-center justify-between border-t border-white/[0.08] pt-4 text-[10px] uppercase tracking-[0.18em] text-white/30">
+              <span>Community signal</span><span>{reviews.length} total entries</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Premium / extra insights */}
         {game.rawgDetails && (
-          <section className="mt-12 overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-950/35 via-white/[0.025] to-transparent">
-            <div className="p-5 sm:p-7">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <section className="relative mt-6 overflow-hidden rounded-[1.75rem] border border-[#d9ff70]/15 bg-[#0e100d]">
+            <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-[#d9ff70]/[0.06] blur-[90px]" />
+            <div className="relative p-6 sm:p-8">
+              <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] px-2 py-1 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 font-semibold tracking-wider">
-                      PREMIUM
-                    </span>
-                    <h3 className="text-lg font-semibold">Extra Insights</h3>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#d9ff70]/25 bg-[#d9ff70]/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-[#d9ff70]"><Sparkles size={11} /> Extra signal</span>
+                    <span className="text-[10px] uppercase tracking-[0.22em] text-white/25">03 / Deep cuts</span>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">
-                    More information about this game and its content.
-                  </p>
+                  <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Beyond the cover.</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">The people behind it, where to find it, and the worlds that came after.</p>
                 </div>
-
-                <Link
-                  href={`/game/${slug}/creators`}
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 transition text-sm font-medium"
-                >
-                  See Creators →
+                <Link href={`/game/${slug}/creators`} className="inline-flex items-center justify-center gap-2 self-start rounded-full bg-[#d9ff70] px-5 py-3 text-xs font-black text-[#08090c] transition hover:bg-white sm:self-auto">
+                  Meet the creators <ArrowUpRight size={15} />
                 </Link>
               </div>
 
-              <div className="mt-6 flex gap-1 border-b border-white/10">
-                <button
-                  onClick={() => setPremiumTab("info")}
-                  className={cn(
-                    "px-4 py-2.5 text-sm border-b-2 transition",
-                    premiumTab === "info"
-                      ? "border-indigo-500 text-white"
-                      : "border-transparent text-gray-500 hover:text-gray-300"
-                  )}
-                >
-                  Info
+              <div className="mt-8 flex gap-6 border-b border-white/10">
+                <button type="button" onClick={() => setPremiumTab("info")} className={cn("relative -mb-px flex items-center gap-2 border-b-2 px-1 pb-3 text-xs font-bold transition", premiumTab === "info" ? "border-[#d9ff70] text-[#d9ff70]" : "border-transparent text-white/40 hover:text-white")}>
+                  <CircleHelp size={14} /> Field notes
                 </button>
-                <button
-                  onClick={() => setPremiumTab("dlc")}
-                  className={cn(
-                    "px-4 py-2.5 text-sm border-b-2 transition",
-                    premiumTab === "dlc"
-                      ? "border-indigo-500 text-white"
-                      : "border-transparent text-gray-500 hover:text-gray-300"
-                  )}
-                >
-                  DLC {dlcList.length > 0 && `(${dlcList.length})`}
+                <button type="button" onClick={() => setPremiumTab("dlc")} className={cn("relative -mb-px flex items-center gap-2 border-b-2 px-1 pb-3 text-xs font-bold transition", premiumTab === "dlc" ? "border-[#d9ff70] text-[#d9ff70]" : "border-transparent text-white/40 hover:text-white")}>
+                  <Gamepad2 size={14} /> Expansion worlds <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[9px]">{dlcList.length}</span>
                 </button>
               </div>
 
               {premiumTab === "info" && (
-                <div className="mt-5 space-y-4">
-                  {game.rawgDetails.developers?.length > 0 && (
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wider text-gray-600 mb-1">
-                        Developers
-                      </p>
-                      <p className="text-sm text-gray-300">
-                        {game.rawgDetails.developers
-                          .map((d: any) => d.name)
-                          .join(", ")}
-                      </p>
-                    </div>
-                  )}
-
-                  {game.rawgDetails.publishers?.length > 0 && (
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wider text-gray-600 mb-1">
-                        Publishers
-                      </p>
-                      <p className="text-sm text-gray-300">
-                        {game.rawgDetails.publishers
-                          .map((p: any) => p.name)
-                          .join(", ")}
-                      </p>
-                    </div>
-                  )}
-
-                  {game.rawgDetails.stores?.length > 0 && (
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wider text-gray-600 mb-2">
-                        Available on
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {game.rawgDetails.stores.map((s: any) =>
-                          s.url ? (
-                            <a
-                              key={s.id ?? s.name}
-                              href={s.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/10 hover:bg-white/10 transition text-xs text-gray-300"
-                            >
-                              {s.name}
-                            </a>
-                          ) : (
-                            <span
-                              key={s.id ?? s.name}
-                              className="px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/10 text-xs text-gray-400"
-                            >
-                              {s.name}
-                            </span>
-                          )
-                        )}
+                <div className="grid gap-7 pt-6 sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/30">Built by</p>
+                    <p className="mt-2 text-sm leading-6 text-white/75">{game.rawgDetails.developers?.length ? game.rawgDetails.developers.map((item: any) => item.name).join(", ") : "Developer information unavailable"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/30">Put out into the world by</p>
+                    <p className="mt-2 text-sm leading-6 text-white/75">{game.rawgDetails.publishers?.length ? game.rawgDetails.publishers.map((item: any) => item.name).join(", ") : "Publisher information unavailable"}</p>
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-1">
+                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/30">Find your copy</p>
+                    {game.rawgDetails.stores?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {game.rawgDetails.stores.map((store: any) => store.url ? (
+                          <a key={store.id ?? store.name} href={store.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-[11px] text-white/65 transition hover:border-[#d9ff70]/30 hover:text-[#d9ff70]">{store.name}<ExternalLink size={11} /></a>
+                        ) : (
+                          <span key={store.id ?? store.name} className="rounded-full border border-white/10 px-3 py-2 text-[11px] text-white/40">{store.name}</span>
+                        ))}
                       </div>
-                    </div>
-                  )}
-
-                  {!game.rawgDetails.developers?.length &&
-                    !game.rawgDetails.publishers?.length &&
-                    !game.rawgDetails.stores?.length && (
-                      <p className="text-sm text-gray-500">
-                        No extra info available.
-                      </p>
-                    )}
+                    ) : <p className="mt-2 text-sm text-white/40">No store links available.</p>}
+                  </div>
                 </div>
               )}
 
               {premiumTab === "dlc" && (
-                <div className="mt-5">
-                  {dlcList.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                <div className="pt-6">
+                  {dlcList.length ? (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                       {dlcList.map((item: any) => (
-                        <Link
-                          key={item.id ?? item.slug}
-                          href={`/game/${item.slug}`}
-                          className="group block rounded-xl overflow-hidden bg-white/[0.035] border border-white/10 hover:border-indigo-500/40 transition"
-                        >
-                          {item.image && (
-                            <div className="relative w-full h-24 overflow-hidden">
-                              <Image
-                                src={item.image}
-                                unoptimized
-                                alt={item.name}
-                                fill
-                                className="object-cover group-hover:scale-105 transition duration-300"
-                              />
-                            </div>
-                          )}
-                          <div className="p-3">
-                            <p className="text-xs font-medium truncate text-gray-200">
-                              {item.name}
-                            </p>
-                            {item.released && (
-                              <p className="text-[10px] text-gray-600 mt-1">
-                                {new Date(item.released).toDateString()}
-                              </p>
-                            )}
+                        <Link key={item.id ?? item.slug} href={`/game/${item.slug}`} className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025] transition hover:-translate-y-1 hover:border-[#d9ff70]/30 hover:bg-white/[0.045]">
+                          <div className="relative aspect-[16/9] overflow-hidden bg-[#17181e]">
+                            {item.image ? <Image src={item.image} alt={item.name} fill unoptimized sizes="(max-width: 640px) 50vw, 25vw" className="object-cover transition duration-700 group-hover:scale-105" /> : <div className="flex h-full items-center justify-center text-white/20"><Gamepad2 size={24} /></div>}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                            <span className="absolute bottom-2 left-3 text-[9px] font-black uppercase tracking-[0.2em] text-[#d9ff70]">Expansion file</span>
+                          </div>
+                          <div className="p-3 sm:p-4">
+                            <p className="truncate text-xs font-bold text-white/85">{item.name}</p>
+                            {item.released && <p className="mt-1.5 text-[10px] text-white/35">{formatDate(item.released)}</p>}
                           </div>
                         </Link>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-500">
-                      No DLC found for this game.
-                    </p>
+                    <div className="rounded-2xl border border-dashed border-white/10 px-5 py-12 text-center">
+                      <Gamepad2 size={24} className="mx-auto text-white/25" />
+                      <p className="mt-3 text-sm font-semibold text-white/60">No extra worlds found.</p>
+                      <p className="mt-1 text-xs text-white/30">This file has no DLC listed right now.</p>
+                    </div>
                   )}
                 </div>
               )}
@@ -554,281 +604,165 @@ export default function GamePage() {
           </section>
         )}
 
-        <section className="mt-14">
-          <div className="mb-6">
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                Reviews
-              </h2>
-              <span className="px-2.5 py-1 rounded-full bg-white/[0.05] border border-white/10 text-xs text-gray-500">
-                {writtenReviews.length}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-gray-500">
-              Honest opinions from players in the VaultGG community.
-            </p>
-          </div>
-
-          {session ? (
-            <div className="relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/[0.09] via-white/[0.025] to-transparent p-5 sm:p-7 mb-8">
-              <div className="absolute -top-24 -right-24 w-56 h-56 rounded-full bg-indigo-500/[0.08] blur-3xl pointer-events-none" />
-
-              <div className="relative">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-semibold">
-                        {ownReviewExists ? "Edit your review" : "Write a review"}
-                      </h3>
-                      <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[10px] text-indigo-300 uppercase tracking-wider">
-                        Your opinion matters
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Rate {game.name} and tell other players what you think.
-                    </p>
-                  </div>
-
-                  <div className="hidden sm:flex w-11 h-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] border border-white/10 text-lg">
-                    ✎
-                  </div>
+        {/* Player reviews */}
+        <section className="mt-16 sm:mt-20">
+          <div className="grid gap-8 lg:grid-cols-[.75fr_1.25fr] lg:gap-12">
+            <div className="lg:sticky lg:top-8 lg:self-start">
+              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#d9ff70]">04 / The campfire</p>
+              <h2 className="mt-4 text-4xl font-black leading-[0.95] tracking-[-0.05em] sm:text-5xl">Your turn<br />to talk.</h2>
+              <p className="mt-4 max-w-sm text-sm leading-7 text-white/45">Games are better when the stories get shared. Leave a signal for the next player.</p>
+              <div className="mt-7 flex items-center gap-3 border-t border-white/10 pt-5">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#d9ff70]/20 bg-[#d9ff70]/[0.07] text-[#d9ff70]"><MessageCircle size={18} /></div>
+                <div>
+                  <p className="text-sm font-bold">{writtenReviews.length} written {writtenReviews.length === 1 ? "review" : "reviews"}</p>
+                  <p className="mt-0.5 text-xs text-white/35">From the baclogged community</p>
                 </div>
+              </div>
+            </div>
 
-                <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4 sm:p-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-200">
-                        Give it a rating
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Half-star ratings are supported.
-                      </p>
+            <div className="min-w-0">
+              {session ? (
+                <div className="relative overflow-hidden rounded-[1.75rem] border border-[#d9ff70]/20 bg-[#11130e] p-5 sm:p-7">
+                  <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#d9ff70]/[0.07] blur-[90px]" />
+                  <div className="relative">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#d9ff70]">Your field notes</p>
+                        <h3 className="mt-2 text-xl font-black tracking-tight">{ownReviewExists ? "Change your verdict." : "Leave your mark."}</h3>
+                        <p className="mt-1 text-xs leading-5 text-white/40">A rating is enough. A story is even better.</p>
+                      </div>
+                      <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-[#d9ff70] sm:flex"><Send size={17} /></div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {rating ? (
-                        <>
-                          <span className="text-2xl font-bold text-white">
-                            {rating.toFixed(1)}
-                          </span>
-                          <span className="text-yellow-400">★</span>
-                        </>
-                      ) : (
-                        <span className="text-xs text-gray-600">
-                          Not rated yet
-                        </span>
-                      )}
+                    <div className="mt-6 rounded-2xl border border-white/[0.08] bg-black/25 p-4 sm:p-5">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold">Rate this adventure</p>
+                          <p className="mt-1 text-[11px] text-white/35">Half stars count. Go with your gut.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl font-black text-[#d9ff70]">{rating ? rating.toFixed(1) : "—"}</span>
+                          <Star size={16} fill={rating ? "currentColor" : "none"} className="text-[#d9ff70]" />
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <Rating
+                          value={rating}
+                          precision={0.5}
+                          size="large"
+                          onChange={(_, value) => { if (value !== null) setRating(value); }}
+                          sx={{
+                            "& .MuiRating-iconEmpty": { color: "#35382e" },
+                            "& .MuiRating-iconFilled": { color: "#d9ff70" },
+                            "& .MuiRating-iconHover": { color: "#f0ffb8" },
+                            "& .MuiRating-icon": { fontSize: { xs: "1.8rem", sm: "2rem" } },
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-5">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <label htmlFor="game-review" className="text-xs font-bold text-white/75">The actual review</label>
+                        <span className={cn("font-mono text-[10px]", reviewText.length >= 950 ? "text-[#d9ff70]" : "text-white/30")}>{reviewText.length}/1000</span>
+                      </div>
+                      <textarea
+                        id="game-review"
+                        value={reviewText}
+                        maxLength={1000}
+                        onChange={(event) => setReviewText(event.target.value)}
+                        placeholder="Did it live rent-free in your head? Did the final boss ruin your evening? Tell us."
+                        className="min-h-[150px] w-full resize-y rounded-2xl border border-white/10 bg-black/25 px-4 py-4 text-sm leading-7 text-white/85 outline-none transition placeholder:text-white/25 hover:border-white/15 focus:border-[#d9ff70]/45 focus:ring-2 focus:ring-[#d9ff70]/[0.08]"
+                      />
+                    </div>
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="max-w-xs text-[10px] leading-5 text-white/30">Your text is optional. Your rating will still be saved.</p>
+                      <button type="button" onClick={submitReview} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#d9ff70] px-5 py-3 text-xs font-black text-[#08090c] transition hover:bg-white active:scale-[0.98]">
+                        {ownReviewExists ? "Update review" : "Post review"} <ArrowUpRight size={14} />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="mt-3">
-                    <StarRating value={rating} onChange={setRating} />
-                  </div>
                 </div>
-
-                <div className="mt-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-300">
-                      Your review
-                    </label>
-                    <span className="text-xs text-gray-600">
-                      {reviewText.length}/1000
-                    </span>
-                  </div>
-
-                  <textarea
-                    placeholder="What did you like? What could be better? Would you recommend it?"
-                    value={reviewText}
-                    maxLength={1000}
-                    onChange={e => setReviewText(e.target.value)}
-                    className="w-full min-h-[145px] resize-none rounded-xl border border-white/10 bg-black/25 px-4 py-4 text-sm leading-6 text-gray-200 placeholder:text-gray-600 outline-none transition hover:border-white/15 focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10"
-                  />
+              ) : (
+                <div className="rounded-[1.75rem] border border-white/10 bg-[#101116] p-7 sm:p-10">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#d9ff70]/20 bg-[#d9ff70]/[0.07] text-[#d9ff70]"><UserRound size={20} /></div>
+                  <h3 className="mt-5 text-2xl font-black tracking-tight">Played it? Prove it.</h3>
+                  <p className="mt-2 max-w-md text-sm leading-7 text-white/45">Log in to rate {game.name} and leave a note for the next person adding it to their backlog.</p>
+                  <div className="mt-6 inline-flex items-center gap-2 text-xs font-bold text-[#d9ff70]"><LockNote /> Your verdict belongs here.</div>
                 </div>
+              )}
 
-                <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <p className="text-xs text-gray-600">
-                    Review text is optional. Your rating will still be saved.
-                  </p>
-
-                  <button
-                    onClick={submitReview}
-                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 shadow-lg shadow-indigo-500/10 transition text-sm font-semibold"
-                  >
-                    {ownReviewExists ? "Update Review" : "Post Review"}
-                  </button>
+              <div className="mt-8 flex items-end justify-between gap-4 border-b border-white/10 pb-4">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/30">From the community</p>
+                  <h3 className="mt-2 text-xl font-black tracking-tight">Player notes <span className="ml-1 text-[#d9ff70]">({writtenReviews.length})</span></h3>
                 </div>
+                <span className="hidden text-[9px] font-bold uppercase tracking-[0.2em] text-white/25 sm:block">Unfiltered opinions</span>
               </div>
-            </div>
-          ) : (
-            <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.025] p-7 sm:p-9 text-center">
-              <div className="mx-auto w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-xl">
-                ★
-              </div>
-              <h3 className="mt-4 text-lg font-semibold">
-                Have you played {game.name}?
-              </h3>
-              <p className="mt-1 max-w-md mx-auto text-sm text-gray-500">
-                Log in to rate this game and share your experience with other
-                players.
-              </p>
-            </div>
-          )}
 
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold">Player opinions</h3>
-                <p className="text-xs text-gray-600 mt-1">
-                  Reviews from the VaultGG community
-                </p>
-              </div>
-            </div>
-
-            {writtenReviews.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center">
-                <div className="mx-auto w-12 h-12 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center text-xl text-gray-500">
-                  💬
+              {writtenReviews.length === 0 ? (
+                <div className="mt-4 rounded-[1.5rem] border border-dashed border-white/10 px-6 py-14 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-white/35"><MessageCircle size={20} /></div>
+                  <h4 className="mt-4 text-sm font-bold text-white/70">The page is quiet. For now.</h4>
+                  <p className="mx-auto mt-2 max-w-xs text-xs leading-6 text-white/35">Be the first to leave a written review and start the conversation.</p>
                 </div>
-                <h4 className="mt-4 text-sm font-medium text-gray-300">
-                  No written reviews yet
-                </h4>
-                <p className="mt-1 text-xs text-gray-600">
-                  Be the first player to share your thoughts.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {writtenReviews.map(r => {
-                  const isOwnReview =
-                    !!session && r.userId._id === session.user.id;
-
-                  return (
-                    <article
-                      key={r._id}
-                      className={cn(
-                        "group rounded-2xl border p-5 sm:p-6 transition duration-200",
-                        isOwnReview
-                          ? "border-indigo-500/25 bg-indigo-500/[0.045]"
-                          : "border-white/8 bg-white/[0.025] hover:bg-white/[0.04] hover:border-white/15"
-                      )}
-                    >
-                
-                      <div className="flex items-start justify-between gap-4">
-                        <Link
-                          href={`/user/${r.userId._id}`}
-                          className="flex items-center gap-3 min-w-0"
-                        >
-                          <div className="relative shrink-0">
-                            <img
-                              src={r.userId.avatar}
-                              alt={r.userId.name}
-                              className="w-11 h-11 rounded-full object-cover ring-1 ring-white/10 group-hover:ring-indigo-500/40 transition"
-                            />
-
-                            {isOwnReview && (
-                              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-indigo-500 border-2 border-black flex items-center justify-center text-[8px] text-white">
-                                ✓
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-semibold text-gray-200 group-hover:text-white transition truncate">
-                                {r.userId.name}
-                              </span>
-
-                              {isOwnReview && (
-                                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] text-indigo-300">
-                                  Your review
-                                </span>
-                              )}
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {writtenReviews.map((review) => {
+                    const isOwnReview = !!session?.user?.id && review.userId?._id === session.user.id;
+                    return (
+                      <article key={review._id} className={cn("group relative overflow-hidden rounded-[1.5rem] border p-5 transition sm:p-6", isOwnReview ? "border-[#d9ff70]/25 bg-[#d9ff70]/[0.035]" : "border-white/[0.08] bg-[#101116] hover:border-white/[0.15] hover:bg-[#131419]")}>
+                        {isOwnReview && <div className="absolute bottom-0 left-0 top-0 w-0.5 bg-[#d9ff70]" />}
+                        <div className="flex items-start justify-between gap-3">
+                          <Link href={`/user/${review.userId?._id}`} className="flex min-w-0 items-center gap-3">
+                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#1b1d21] text-xs font-black text-[#d9ff70] transition group-hover:border-[#d9ff70]/25">
+                              {review.userId?.avatar ? <img src={review.userId.avatar} alt={review.userId?.name || "Player avatar"} className="h-full w-full object-cover" /> : initials(review.userId?.name)}
                             </div>
-
-                            <div className="flex items-center gap-2 mt-1.5">
-                              <div className="flex items-center gap-0.5">
-                                {[1, 2, 3, 4, 5].map(star => (
-                                  <span
-                                    key={star}
-                                    className={cn(
-                                      "text-xs",
-                                      star <= r.rating
-                                        ? "text-yellow-400"
-                                        : "text-zinc-700"
-                                    )}
-                                  >
-                                    ★
-                                  </span>
-                                ))}
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="truncate text-sm font-bold text-white/85 transition group-hover:text-white">{review.userId?.name || "Unknown player"}</span>
+                                {isOwnReview && <span className="inline-flex items-center gap-1 rounded-full bg-[#d9ff70]/10 px-2 py-0.5 text-[9px] font-bold text-[#d9ff70]"><Check size={10} /> Yours</span>}
                               </div>
-                              <span className="text-xs font-medium text-gray-400">
-                                {Number(r.rating).toFixed(1)}
-                              </span>
+                              <div className="mt-1.5 flex items-center gap-2">
+                                <div className="flex items-center gap-0.5">
+                                  {[1, 2, 3, 4, 5].map((star) => <Star key={star} size={11} fill={star <= Number(review.rating) ? "currentColor" : "none"} className={star <= Number(review.rating) ? "text-[#d9ff70]" : "text-white/15"} />)}
+                                </div>
+                                <span className="font-mono text-[10px] text-white/40">{Number(review.rating).toFixed(1)}</span>
+                              </div>
                             </div>
-                          </div>
-                        </Link>
+                          </Link>
+                          <button type="button" onClick={() => reportReview(review._id)} className="shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold text-white/30 transition hover:bg-red-400/10 hover:text-red-300">Report</button>
+                        </div>
 
-                        <button
-                          onClick={() => reportReview(r._id)}
-                          className="shrink-0 text-xs text-gray-600 hover:text-red-400 transition"
-                        >
-                          Report
-                        </button>
-                      </div>
+                        <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-white/65">{review.reviewText}</p>
 
-              
-                      <div className="mt-5 pl-0 sm:pl-14">
-                        <p className="text-sm leading-7 text-gray-300 whitespace-pre-wrap">
-                          {r.reviewText}
-                        </p>
-                      </div>
-
-                    
-                      <div className="mt-5 pt-4 border-t border-white/5 pl-0 sm:pl-14 flex items-center gap-2">
-                        <button
-                          onClick={() => reactToReview(r._id, "like")}
-                          className={cn(
-                            "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs transition",
-                            r.reaction === "like"
-                              ? "bg-green-500/10 border-green-500/30 text-green-400"
-                              : "bg-white/[0.02] border-white/10 text-gray-500 hover:text-green-400 hover:border-green-500/20"
-                          )}
-                        >
-                          <span>👍</span>
-                          <span>{r.likes || 0}</span>
-                        </button>
-
-                        <button
-                          onClick={() => reactToReview(r._id, "dislike")}
-                          className={cn(
-                            "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs transition",
-                            r.reaction === "dislike"
-                              ? "bg-red-500/10 border-red-500/30 text-red-400"
-                              : "bg-white/[0.02] border-white/10 text-gray-500 hover:text-red-400 hover:border-red-500/20"
-                          )}
-                        >
-                          <span>👎</span>
-                          <span>{r.dislikes || 0}</span>
-                        </button>
-
-                        <div className="flex-1" />
-
-                        {(r.likes || 0) > 0 && (
-                          <span className="hidden sm:block text-[11px] text-gray-600">
-                            {r.likes === 1
-                              ? "1 player found this helpful"
-                              : `${r.likes} players found this helpful`}
-                          </span>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
+                        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/[0.07] pt-4">
+                          <button type="button" onClick={() => reactToReview(review._id, "like")} className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-bold transition", review.reaction === "like" ? "border-[#d9ff70]/30 bg-[#d9ff70]/10 text-[#d9ff70]" : "border-white/10 text-white/40 hover:border-[#d9ff70]/25 hover:text-[#d9ff70]")}>
+                            <ThumbsUp size={12} /> Helpful <span>{review.likes || 0}</span>
+                          </button>
+                          <button type="button" onClick={() => reactToReview(review._id, "dislike")} className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-bold transition", review.reaction === "dislike" ? "border-red-400/30 bg-red-400/10 text-red-300" : "border-white/10 text-white/40 hover:border-red-400/25 hover:text-red-300")}>
+                            <ThumbsDown size={12} /> Not for me <span>{review.dislikes || 0}</span>
+                          </button>
+                          <span className="ml-auto hidden items-center gap-1 text-[9px] uppercase tracking-[0.16em] text-white/20 sm:inline-flex"><Sparkles size={11} /> Player signal</span>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </section>
+
+        <footer className="mt-20 flex flex-col gap-3 border-t border-white/[0.08] pt-6 text-[9px] font-bold uppercase tracking-[0.24em] text-white/25 sm:flex-row sm:items-center sm:justify-between">
+          <span>baclogged / player archive</span>
+          <span className="inline-flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#d9ff70]" /> Keep the good games close.</span>
+        </footer>
       </main>
-    </>
+    </div>
   );
+}
+
+function LockNote() {
+  return <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#d9ff70]/30 text-[9px]">↗</span>;
 }

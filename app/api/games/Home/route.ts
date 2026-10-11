@@ -2,13 +2,14 @@ import { connectToDatabase } from "@/lib/db";
 import Game from "@/models/game";
 import { NextResponse } from "next/server";
 
-export const revalidate = 3600; // cache 1 hour
+export const revalidate = 3600; 
 
 export async function GET() {
   try {
     await connectToDatabase();
 
     const FEATURED_SLUGS = [
+      "crimson-desert",
       "dark-souls-iii",
       "the-last-of-us-part-2",
       "elden-ring",

@@ -2,7 +2,7 @@
 
 Baclogged is a full-stack game review and collection platform where users can discover games, maintain their personal collections, rate and review games, and interact with community content.
 
-The platform integrates the RAWG Video Games Database API with a MongoDB-backed caching layer to reduce redundant external API requests. It also includes role-based authentication, moderation workflows, secure payment processing, database-level constraints, rate limiting, and duplicate-prevention mechanisms.
+The platform integrates the RAWG Video Games Database API with a MongoDB-backed caching layer to reduce redundant external API requests. It also includes role-based authentication, moderation workflows, AI-powered avatar moderation, secure payment processing, database-level constraints, rate limiting, and duplicate-prevention mechanisms.
 
 ## 🚀 Live Demo & Repository
 
@@ -51,6 +51,13 @@ The platform integrates the RAWG Video Games Database API with a MongoDB-backed 
 - Prevented duplicate reports using a unique compound database index.
 - Added moderation controls for administrators to maintain content quality.
 
+### 🤖 AI-Powered Avatar Moderation
+
+- Built a two-stage avatar moderation system to keep inappropriate images off the platform.
+- **Stage 1 (pre-upload screening):** images are screened with the Gemini API before they are uploaded.
+- **Stage 2 (asynchronous moderation):** uploaded images are moderated asynchronously using Cloudinary Rekognition.
+- Webhook-triggered automatic deletion of flagged images, with no manual admin intervention required.
+
 ### 🗄️ Database-Level Integrity
 
 - Used atomic database operations for critical review-related workflows.
@@ -92,6 +99,8 @@ The platform integrates the RAWG Video Games Database API with a MongoDB-backed 
 
 - RAWG Video Games Database API
 - Razorpay Payment Gateway
+- Gemini API (pre-upload avatar screening)
+- Cloudinary (image hosting and Rekognition-based moderation)
 
 ### Developer Tools
 
@@ -136,3 +145,22 @@ A unique database constraint ensures:
 
 ```text
 One user → One review → One game
+```
+
+### 🚩 Reports & Moderation Queue
+
+Reports are linked to reviews and the reporting user. A unique compound index prevents duplicate reports, and per-user daily rate limits prevent report spam. Reported content is surfaced to administrators through a dedicated review queue.
+
+### 🖼️ Avatar Moderation Pipeline
+
+```text
+User selects avatar
+        ↓
+Stage 1: Gemini API screening (pre-upload)
+        ↓ (passes)
+Upload to Cloudinary
+        ↓
+Stage 2: Cloudinary Rekognition (asynchronous moderation)
+        ↓ (flagged)
+Webhook triggers automatic deletion of the image
+```

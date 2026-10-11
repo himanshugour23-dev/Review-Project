@@ -115,6 +115,124 @@ The platform integrates the RAWG Video Games Database API with a MongoDB-backed 
 
 Baclogged uses a MongoDB-based architecture with separate collections for users, games, reviews, reports, and user-specific game data.
 
+### 🗺️ System Architecture Diagram
+
+```mermaid
+flowchart TD
+
+subgraph group_discovery["Game discovery"]
+  node_browse["Browse games<br/>[page.tsx]"]
+  node_discover["Discover picks<br/>[DiscoverClient.tsx]"]
+  node_gameview["Game details<br/>[page.tsx]"]
+  node_gameapi["Game detail API<br/>[route.ts]"]
+  node_gameendpoints["Game discovery APIs"]
+end
+
+subgraph group_community["Reviews and moderation"]
+  node_reviewform["Review experience<br/>[page.tsx]"]
+  node_reviewapi["Review API<br/>[route.ts]"]
+  node_reviewdata[("Reviews<br/>[review.ts]")]
+  node_reactionapi["Reaction API<br/>[route.ts]"]
+  node_reactiondata[("Review reactions<br/>[reviewReaction.ts]")]
+  node_reportapi["Report API<br/>[route.ts]"]
+  node_reportdata[("Reports<br/>[report.ts]")]
+  node_moderation["Admin moderation<br/>[page.tsx]"]
+end
+
+subgraph group_identity["Identity and profiles"]
+  node_auth["Authentication<br/>[auth.ts]"]
+  node_authroute["Auth endpoint<br/>[route.ts]"]
+  node_profiles["Profile and collection<br/>[page.tsx]"]
+  node_userapi["User APIs"]
+  node_userdata[("Users<br/>[User.ts]")]
+  node_avatar["Avatar moderation<br/>[avatarModration.ts]"]
+  node_avatarapi["Avatar endpoint<br/>[route.ts]"]
+  node_webhook["Moderation webhook<br/>[route.ts]"]
+end
+
+subgraph group_commerce["Premium and payments"]
+  node_checkout["Checkout details<br/>[page.tsx]"]
+  node_checkoutbutton["Razorpay checkout"]
+  node_orderapi["Order API<br/>[route.ts]"]
+  node_paymentapi["Payment callback<br/>[route.ts]"]
+  node_paymentdata[("Payments<br/>[payment.ts]")]
+end
+
+subgraph group_platform["Data and integrations"]
+  node_rawgclient["RAWG client<br/>[rawg.ts]"]
+  node_gamecache[("Game cache<br/>[game.ts]")]
+  node_dbconnection["Database connection<br/>[db.ts]"]
+end
+
+node_visitor(("Player"))
+node_rawgservice["RAWG service"]
+node_cloudinary["Cloudinary"]
+node_razorpay["Razorpay"]
+node_database[("MongoDB")]
+
+node_visitor -->|"browses"| node_browse
+node_visitor -->|"discovers"| node_discover
+node_visitor -->|"opens game"| node_gameview
+node_discover -.->|"loads picks"| node_gameendpoints
+node_browse -.->|"requests games"| node_gameendpoints
+node_gameview -.->|"loads details"| node_gameapi
+node_gameapi -->|"reads game"| node_gamecache
+node_gameapi -->|"loads reviews"| node_reviewdata
+node_gameapi -->|"loads authors"| node_userdata
+node_gameapi -->|"loads reactions"| node_reactiondata
+node_gameapi -->|"fetches details"| node_rawgclient
+node_rawgclient -.->|"requests metadata"| node_rawgservice
+node_visitor -->|"writes review"| node_reviewform
+node_reviewform -.->|"submits review"| node_reviewapi
+node_reviewapi -->|"resolves author"| node_userdata
+node_reviewapi -->|"checks game"| node_gamecache
+node_reviewapi -->|"upserts review"| node_reviewdata
+node_reviewapi -->|"updates rating"| node_gamecache
+node_visitor -->|"reacts"| node_reactionapi
+node_reactionapi -->|"writes reaction"| node_reactiondata
+node_visitor -->|"reports review"| node_reportapi
+node_reportapi -->|"checks review"| node_reviewdata
+node_reportapi -->|"creates report"| node_reportdata
+node_moderation -.->|"reviews queue"| node_reportdata
+node_visitor -->|"signs in"| node_authroute
+node_authroute -.->|"uses auth"| node_auth
+node_auth -->|"loads identity"| node_userdata
+node_profiles -.->|"loads profile"| node_userapi
+node_userapi -->|"reads profile"| node_userdata
+node_visitor -->|"updates avatar"| node_avatarapi
+node_avatarapi -.->|"screens upload"| node_avatar
+node_avatar -.->|"uploads image"| node_cloudinary
+node_cloudinary -->|"sends event"| node_webhook
+node_webhook -->|"deletes flagged image"| node_cloudinary
+node_webhook -->|"clears avatar"| node_userdata
+node_visitor -->|"starts purchase"| node_checkout
+node_checkout -->|"renders checkout"| node_checkoutbutton
+node_checkoutbutton -.->|"creates order"| node_orderapi
+node_orderapi -.->|"creates payment"| node_razorpay
+node_razorpay -.->|"returns payment"| node_paymentapi
+node_paymentapi -->|"records payment"| node_paymentdata
+node_paymentapi -->|"grants premium"| node_userdata
+node_gameapi -->|"connects database"| node_dbconnection
+node_reviewapi -->|"connects database"| node_dbconnection
+node_reactionapi -->|"connects database"| node_dbconnection
+node_reportapi -->|"connects database"| node_dbconnection
+node_dbconnection -->|"connects"| node_database
+node_visitor -->|"manages collection"| node_profiles
+
+classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
+class node_browse,node_discover,node_gameview,node_gameapi,node_gameendpoints toneBlue
+class node_reviewform,node_reviewapi,node_reviewdata,node_reactionapi,node_reactiondata,node_reportapi,node_reportdata,node_moderation,node_database toneAmber
+class node_auth,node_authroute,node_profiles,node_userapi,node_userdata,node_avatar,node_avatarapi,node_webhook toneMint
+class node_checkout,node_checkoutbutton,node_orderapi,node_paymentapi,node_paymentdata toneRose
+class node_rawgclient,node_gamecache,node_dbconnection,node_visitor,node_rawgservice,node_cloudinary,node_razorpay toneIndigo
+```
+
 ### 👤 Users & Profiles
 
 Stores user identity, authentication provider information, profile details, roles, and user-specific game preferences.

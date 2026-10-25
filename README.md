@@ -117,6 +117,9 @@ Baclogged uses a MongoDB-based architecture with separate collections for users,
 
 ### 🗺️ System Architecture Diagram
 
+An implementation-driven interactive architecture page is available in the app at **`/architecture`**.
+It supports pan/zoom, layer/domain filtering, and node-level file details based on the current codebase.
+
 ```mermaid
 flowchart TD
 

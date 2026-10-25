@@ -16,6 +16,7 @@ import {
   Gamepad2,
   Sparkles,
   UserRound,
+  GitBranch,
 } from "lucide-react";
 import { useUser } from "@/app/providers/UserProvider";
 
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/discover", label: "Discover", icon: Compass, mark: "01" },
   { href: "/browse", label: "Browse", icon: Gamepad2, mark: "02" },
   { href: "/checkoutPageDetails", label: "Premium", icon: Sparkles, mark: "03" },
+  { href: "/architecture", label: "Architecture", icon: GitBranch, mark: "04" },
 ];
 
 export default function Navbar() {
@@ -287,7 +289,7 @@ export default function Navbar() {
                   {searchResults(true)}
                 </div>
 
-                <p className="mb-3 font-mono text-[9px] uppercase tracking-[0.28em] text-[#d9ff70]/65">Navigate the archive / 01—03</p>
+                <p className="mb-3 font-mono text-[9px] uppercase tracking-[0.28em] text-[#d9ff70]/65">Navigate the archive / 01—04</p>
                 <nav className="grid gap-2 sm:grid-cols-3">
                   {navItems.map(({ href, label, icon: Icon, mark }) => (
                     <Link key={href} href={href} onClick={closeMobile} className="group flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5 transition hover:border-[#d9ff70]/25 hover:bg-[#d9ff70]/[0.055]">

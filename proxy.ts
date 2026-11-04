@@ -6,10 +6,12 @@ export async function proxy(req: NextRequest) {
   const token = await getToken({ req });
   const { pathname } = req.nextUrl;
  const isMaintenanceMode = process.env.MAINTENANCE_MODE === "true";
-
+  console.log("Maintenance mode:", isMaintenanceMode);
+  console.log("Request pathname:", pathname);
   if (isMaintenanceMode && !pathname.startsWith("/maintenance")) {
     return NextResponse.redirect(new URL("/maintenance", req.url));
   }
+
   if (pathname.startsWith("/user") && !token) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
@@ -28,5 +30,7 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/user/:path*", "/login" , "/admin/:path*"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+  ],
 };

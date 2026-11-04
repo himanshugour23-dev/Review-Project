@@ -5,18 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Search,
-  Menu,
-  X,
-  LogOut,
-  Compass,
-  Shield,
-  ArrowUpRight,
-  Gamepad2,
-  Sparkles,
-  UserRound,
-} from "lucide-react";
+import {Search,Menu,X,LogOut,Compass,Shield,ArrowUpRight,Gamepad2,Sparkles,UserRound,} from "lucide-react";
 import { useUser } from "@/app/providers/UserProvider";
 
 interface Game {

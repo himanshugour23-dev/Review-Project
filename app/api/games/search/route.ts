@@ -26,9 +26,7 @@ export async function GET(req: Request) {
       .limit(10)
       .lean();
 
-      const isFresh =
-      existingGames.length > 0 &&
-      existingGames.every(
+      const isFresh = existingGames.length > 0 && existingGames.every(
         (game) =>
           game.lastFetched &&
           Date.now() - new Date(game.lastFetched).getTime() < THIRTY_DAYS
@@ -38,7 +36,6 @@ export async function GET(req: Request) {
       return NextResponse.json(existingGames);
     }
     
-
     const rawgGames = await searchRawgGames(query);
 
       const cleanedGames = rawgGames
@@ -83,7 +80,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json(savedGames);
   } catch (error) {
-   
+    console.error("Error in GET /api/games/search:", error);
     return NextResponse.json(
       { error: "Something went wrong" },
       { status: 500 }

@@ -5,7 +5,11 @@ import { getToken } from "next-auth/jwt";
 export async function proxy(req: NextRequest) {
   const token = await getToken({ req });
   const { pathname } = req.nextUrl;
+ const isMaintenanceMode = process.env.MAINTENANCE_MODE === "true";
 
+  if (isMaintenanceMode && !pathname.startsWith("/maintenance")) {
+    return NextResponse.redirect(new URL("/maintenance", req.url));
+  }
   if (pathname.startsWith("/user") && !token) {
     return NextResponse.redirect(new URL("/login", req.url));
   }

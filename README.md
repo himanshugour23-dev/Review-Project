@@ -142,28 +142,32 @@ flowchart TD
 subgraph group_discovery["Game discovery"]
   node_browse["Browse games<br/>[page.tsx]"]
   node_discover["Discover picks<br/>[DiscoverClient.tsx]"]
+  node_discoverapi["Discovery API<br/>[route.ts]"]
   node_gameview["Game details<br/>[page.tsx]"]
   node_gameapi["Game detail API<br/>[route.ts]"]
-  node_gameendpoints["Game discovery APIs"]
+  node_gamebrowseapi["Browse API<br/>[route.ts]"]
+  node_gamesearchapi["Search API<br/>[route.ts]"]
+  node_creators["Creator details<br/>[page.tsx]"]
+  node_home["Home experience<br/>[HomePage.tsx]"]
 end
 
-subgraph group_community["Reviews and moderation"]
-  node_reviewform["Review experience<br/>[page.tsx]"]
+subgraph group_community["Community and moderation"]
   node_reviewapi["Review API<br/>[route.ts]"]
-  node_reviewdata[("Reviews<br/>[review.ts]")]
+  node_reviews[("Reviews<br/>[review.ts]")]
   node_reactionapi["Reaction API<br/>[route.ts]"]
-  node_reactiondata[("Review reactions<br/>[reviewReaction.ts]")]
+  node_reactions[("Review reactions<br/>[reviewReaction.ts]")]
   node_reportapi["Report API<br/>[route.ts]"]
-  node_reportdata[("Reports<br/>[report.ts]")]
-  node_moderation["Admin moderation<br/>[page.tsx]"]
+  node_reports[("Reports<br/>[report.ts]")]
+  node_adminqueue["Admin moderation<br/>[page.tsx]"]
+  node_adminreports["Admin report API<br/>[route.ts]"]
 end
 
-subgraph group_identity["Identity and profiles"]
+subgraph group_identity["Identity and collections"]
   node_auth["Authentication<br/>[auth.ts]"]
   node_authroute["Auth endpoint<br/>[route.ts]"]
-  node_profiles["Profile and collection<br/>[page.tsx]"]
-  node_userapi["User APIs"]
-  node_userdata[("Users<br/>[User.ts]")]
+  node_profiles["Profiles and collection<br/>[page.tsx]"]
+  node_userapi["User APIs<br/>[route.ts]"]
+  node_users[("Users<br/>[User.ts]")]
   node_avatar["Avatar moderation<br/>[avatarModration.ts]"]
   node_avatarapi["Avatar endpoint<br/>[route.ts]"]
   node_webhook["Moderation webhook<br/>[route.ts]"]
@@ -171,75 +175,92 @@ end
 
 subgraph group_commerce["Premium and payments"]
   node_checkout["Checkout details<br/>[page.tsx]"]
-  node_checkoutbutton["Razorpay checkout"]
+  node_checkoutapi["Checkout API<br/>[route.ts]"]
   node_orderapi["Order API<br/>[route.ts]"]
-  node_paymentapi["Payment callback<br/>[route.ts]"]
-  node_paymentdata[("Payments<br/>[payment.ts]")]
+  node_callback["Payment callback<br/>[route.ts]"]
+  node_payments[("Payments<br/>[payment.ts]")]
+  node_razorpaybutton["Razorpay checkout"]
 end
 
-subgraph group_platform["Game data and integrations"]
+subgraph group_platform["Data and integrations"]
   node_igdbclient["IGDB client<br/>[igdb.ts]"]
-  node_igdbcache[("IGDB game records<br/>[igdbGames.ts]")]
-  node_twitchauth["Twitch OAuth 2.0"]
-  node_dbconnection["Database connection<br/>[db.ts]"]
+  node_igdbgames[("IGDB game records<br/>[igdbGames.ts]")]
 end
 
-node_visitor(("Player"))
-node_igdbservice["IGDB API"]
-node_cloudinary["Cloudinary"]
-node_razorpay["Razorpay"]
-node_database[("MongoDB")]
+node_player(("Player"))
 
-node_visitor -->|"browses"| node_browse
-node_visitor -->|"discovers"| node_discover
-node_visitor -->|"opens game"| node_gameview
-node_discover -.->|"loads picks"| node_gameendpoints
-node_browse -.->|"requests games"| node_gameendpoints
+node_player -->|"browses"| node_browse
+node_player -->|"discovers"| node_discover
+node_player -->|"opens title"| node_gameview
+node_discover -->|"fetches picks"| node_discoverapi
+node_browse -.->|"requests games"| node_gamebrowseapi
 node_gameview -.->|"loads details"| node_gameapi
-node_gameapi -->|"reads game"| node_igdbcache
-node_gameapi -->|"loads reviews"| node_reviewdata
-node_gameapi -->|"loads authors"| node_userdata
-node_gameapi -->|"loads reactions"| node_reactiondata
-node_gameapi -->|"requests game data"| node_igdbclient
-node_igdbclient -.->|"gets access token"| node_twitchauth
-node_twitchauth -.->|"authenticates"| node_igdbservice
-node_igdbclient -.->|"requests metadata"| node_igdbservice
-node_visitor -->|"writes review"| node_reviewform
-node_reviewform -.->|"submits review"| node_reviewapi
-node_reviewapi -->|"resolves author"| node_userdata
-node_reviewapi -->|"checks game"| node_igdbcache
-node_reviewapi -->|"upserts review"| node_reviewdata
-node_reviewapi -->|"updates rating"| node_igdbcache
-node_visitor -->|"reacts"| node_reactionapi
-node_reactionapi -->|"writes reaction"| node_reactiondata
-node_visitor -->|"reports review"| node_reportapi
-node_reportapi -->|"checks review"| node_reviewdata
-node_reportapi -->|"creates report"| node_reportdata
-node_moderation -.->|"reviews queue"| node_reportdata
-node_visitor -->|"signs in"| node_authroute
-node_authroute -.->|"uses auth"| node_auth
-node_auth -->|"loads identity"| node_userdata
-node_profiles -.->|"loads profile"| node_userapi
-node_userapi -->|"reads profile"| node_userdata
-node_visitor -->|"updates avatar"| node_avatarapi
+node_gameapi -->|"reads and refreshes"| node_igdbgames
+node_gameapi -->|"fetches metadata"| node_igdbclient
+node_gameapi -->|"loads reviews"| node_reviews
+node_gameapi -->|"populates authors"| node_users
+node_gameapi -->|"loads reactions"| node_reactions
+node_player -->|"submits reviews"| node_reviewapi
+node_reviewapi -->|"creates or updates"| node_reviews
+node_reviewapi -->|"updates ratings"| node_igdbgames
+node_player -->|"reacts"| node_reactionapi
+node_reactionapi -->|"creates or updates"| node_reactions
+node_player -->|"reports content"| node_reportapi
+node_reportapi -->|"checks target"| node_reviews
+node_reportapi -->|"records report"| node_reports
+node_adminqueue -.->|"manages queue"| node_adminreports
+node_adminreports -.->|"reads reports"| node_reports
+node_player -->|"signs in"| node_authroute
+node_authroute -.->|"uses configuration"| node_auth
+node_auth -->|"resolves identity"| node_users
+node_player -->|"manages collection"| node_profiles
+node_profiles -.->|"uses profile APIs"| node_userapi
+node_userapi -.->|"reads and updates"| node_users
+node_player -->|"updates avatar"| node_avatarapi
 node_avatarapi -.->|"screens upload"| node_avatar
-node_avatar -.->|"uploads image"| node_cloudinary
-node_cloudinary -->|"sends event"| node_webhook
-node_webhook -->|"deletes flagged image"| node_cloudinary
-node_webhook -->|"clears avatar"| node_userdata
-node_visitor -->|"starts purchase"| node_checkout
-node_checkout -->|"renders checkout"| node_checkoutbutton
-node_checkoutbutton -.->|"creates order"| node_orderapi
-node_orderapi -.->|"creates payment"| node_razorpay
-node_razorpay -.->|"returns payment"| node_paymentapi
-node_paymentapi -->|"records payment"| node_paymentdata
-node_paymentapi -->|"grants premium"| node_userdata
-node_gameapi -->|"connects database"| node_dbconnection
-node_reviewapi -->|"connects database"| node_dbconnection
-node_reactionapi -->|"connects database"| node_dbconnection
-node_reportapi -->|"connects database"| node_dbconnection
-node_dbconnection -->|"connects"| node_database
-node_visitor -->|"manages collection"| node_profiles
+node_avatarapi -.->|"triggers moderation"| node_webhook
+node_webhook -->|"clears flagged avatar"| node_users
+node_player -->|"purchases premium"| node_checkout
+node_checkout -->|"starts payment"| node_razorpaybutton
+node_razorpaybutton -.->|"creates order"| node_orderapi
+node_orderapi -.->|"records payment"| node_payments
+node_callback -->|"verifies payment"| node_payments
+node_callback -->|"grants premium"| node_users
+node_igdbclient -.->|"caches metadata"| node_igdbgames
+
+click node_browse "https://github.com/himanshugour23-dev/review-project/blob/main/app/browse/page.tsx"
+click node_discover "https://github.com/himanshugour23-dev/review-project/blob/main/app/discover/DiscoverClient.tsx"
+click node_discoverapi "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/games/discover/route.ts"
+click node_gameview "https://github.com/himanshugour23-dev/review-project/blob/main/app/game/%5Bslug%5D/page.tsx"
+click node_gameapi "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/games/%5Bslug%5D/route.ts"
+click node_gamebrowseapi "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/games/browse/route.ts"
+click node_gamesearchapi "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/games/search/route.ts"
+click node_creators "https://github.com/himanshugour23-dev/review-project/blob/main/app/game/%5Bslug%5D/creators/page.tsx"
+click node_home "https://github.com/himanshugour23-dev/review-project/blob/main/homeComponents/HomePage.tsx"
+click node_reviewapi "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/reviews/route.ts"
+click node_reviews "https://github.com/himanshugour23-dev/review-project/blob/main/models/review.ts"
+click node_reactionapi "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/reactions/route.ts"
+click node_reactions "https://github.com/himanshugour23-dev/review-project/blob/main/models/reviewReaction.ts"
+click node_reportapi "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/reports/route.ts"
+click node_reports "https://github.com/himanshugour23-dev/review-project/blob/main/models/report.ts"
+click node_adminqueue "https://github.com/himanshugour23-dev/review-project/blob/main/app/admin/reports/page.tsx"
+click node_adminreports "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/admin/reports/route.ts"
+click node_auth "https://github.com/himanshugour23-dev/review-project/blob/main/lib/auth.ts"
+click node_authroute "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/auth/%5B...nextauth%5D/route.ts"
+click node_profiles "https://github.com/himanshugour23-dev/review-project/blob/main/app/user/me/page.tsx"
+click node_userapi "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/user/me/route.ts"
+click node_users "https://github.com/himanshugour23-dev/review-project/blob/main/models/User.ts"
+click node_avatar "https://github.com/himanshugour23-dev/review-project/blob/main/lib/avatarModration.ts"
+click node_avatarapi "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/user/me/avatar/route.ts"
+click node_webhook "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/cloudinary-webhook/route.ts"
+click node_checkout "https://github.com/himanshugour23-dev/review-project/blob/main/app/checkoutPageDetails/page.tsx"
+click node_checkoutapi "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/checkout/route.ts"
+click node_orderapi "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/payment/create-order/route.ts"
+click node_callback "https://github.com/himanshugour23-dev/review-project/blob/main/app/api/payment/callback/route.ts"
+click node_payments "https://github.com/himanshugour23-dev/review-project/blob/main/models/payment.ts"
+click node_razorpaybutton "https://github.com/himanshugour23-dev/review-project/blob/main/components/RazorpayCheckoutButton.tsx"
+click node_igdbclient "https://github.com/himanshugour23-dev/review-project/blob/main/lib/igdb.ts"
+click node_igdbgames "https://github.com/himanshugour23-dev/review-project/blob/main/models/igdbGames.ts"
 
 classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
 classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
@@ -247,11 +268,12 @@ classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
 classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
 classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
 classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
-class node_browse,node_discover,node_gameview,node_gameapi,node_gameendpoints toneBlue
-class node_reviewform,node_reviewapi,node_reviewdata,node_reactionapi,node_reactiondata,node_reportapi,node_reportdata,node_moderation,node_database toneAmber
-class node_auth,node_authroute,node_profiles,node_userapi,node_userdata,node_avatar,node_avatarapi,node_webhook toneMint
-class node_checkout,node_checkoutbutton,node_orderapi,node_paymentapi,node_paymentdata toneRose
-class node_igdbclient,node_igdbcache,node_twitchauth,node_visitor,node_igdbservice,node_cloudinary,node_razorpay toneIndigo
+classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
+class node_browse,node_discover,node_discoverapi,node_gameview,node_gameapi,node_gamebrowseapi,node_gamesearchapi,node_creators,node_home toneBlue
+class node_reviewapi,node_reviews,node_reactionapi,node_reactions,node_reportapi,node_reports,node_adminqueue,node_adminreports toneAmber
+class node_auth,node_authroute,node_profiles,node_userapi,node_users,node_avatar,node_avatarapi,node_webhook toneMint
+class node_checkout,node_checkoutapi,node_orderapi,node_callback,node_payments,node_razorpaybutton toneRose
+class node_igdbclient,node_igdbgames,node_player toneIndigo
 ```
 
 ### 👤 Users & Profiles

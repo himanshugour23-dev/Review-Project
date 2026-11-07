@@ -2,27 +2,21 @@ import { NextResponse,NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
 import Review from "@/models/review";
-import Game from "@/models/game";
+import igdbGames from "@/models/igdbGames";
 import mongoose from "mongoose";
 
-export async function GET(
-  req:  NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function GET(req:  NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
     }
-
     await connectToDatabase();
-
     const user = await User.findById(id)
       .select("name avatar bio socials favoriteGames")
       .populate({
         path: "favoriteGames",
-        model: Game,
+        model: igdbGames,
         select: "name slug coverImage",
       })
       .lean();
@@ -34,7 +28,7 @@ export async function GET(
     const reviews = await Review.find({ userId: id })
       .populate({
         path: "gameId",
-        model: Game,
+        model: igdbGames,
         select: "name slug coverImage",
       })
       .sort({ createdAt: -1 })

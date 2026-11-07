@@ -3,7 +3,7 @@ import { getToken } from "next-auth/jwt";
 import User from "@/models/User";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
-import Game from "@/models/game";
+import igdbGames from "@/models/igdbGames";
 import Review from "@/models/review";
 export async function GET(req: NextRequest) {
   try {
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       .select("name avatar bio favoriteGames")
       .populate({
         path: "favoriteGames",
-        model: Game,
+        model: igdbGames,
         select: "name slug coverImage",
       })
       .lean();
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const review = await Review.find({ userId })
       .populate({
         path: "gameId",
-        model: Game,
+        model: igdbGames,
         select: "name slug coverImage",
       })
       .sort({ createdAt: -1 })

@@ -1,29 +1,28 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, Gamepad2, Heart, Sparkles, Trophy } from "lucide-react";
-
 import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
-
 interface Game {
   _id: string;
   name: string;
   slug: string;
   coverImage: string;
   metacritic?: number;
-  rawgRating?: number;
+  igdbRating?: number;
+  igdbRatingCount?: number;
+  aggregatedRatingCount?: number;
+  averageRating?: number;
+  reviewCount?: number;
   released: string;
 }
-
 type DiscoverTab = "critics" | "loved";
-
 function GameCard({ game, index, tab }: { game: Game; index: number; tab: DiscoverTab }) {
-  const score = tab === "critics" ? game.metacritic : game.rawgRating;
-
+  const rawScore = tab === "critics" ? game.metacritic : game.igdbRating;
+  const score = typeof rawScore === "number" ? `${(rawScore / 20).toFixed(1)}/5` : "—";
   return (
     <motion.article
       initial={{ opacity: 0, y: 18 }}
@@ -66,38 +65,36 @@ function GameCard({ game, index, tab }: { game: Game; index: number; tab: Discov
     </motion.article>
   );
 }
-
 function LoadingGrid() {
   return <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{Array.from({ length: 12 }).map((_, i) => <div key={i} className="animate-pulse overflow-hidden rounded-2xl border border-white/[0.06] bg-zinc-950"><div className="aspect-[2/3] bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-800" /><div className="space-y-2 p-3"><div className="h-3 w-4/5 rounded bg-zinc-800" /><div className="h-3 w-2/5 rounded bg-zinc-900" /></div></div>)}</div>;
 }
-
 export default function DiscoverClient() {
   const [criticsChoice, setCriticsChoice] = useState<Game[]>([]);
   const [mostLoved, setMostLoved] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<DiscoverTab>("critics");
   const [error, setError] = useState(false);
-
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/games/discover")
-      .then((res) => {
-        if (!res.ok) throw new Error("Could not load games");
-        return res.json();
+    Promise.all([
+      fetch("/api/games/discover?type=critics&page=1&limit=18", { cache: "no-store" }),
+      fetch("/api/games/discover?type=most-loved&page=1&limit=18", { cache: "no-store" })
+    ])
+      .then(async ([criticsRes, lovedRes]) => {
+        if (!criticsRes.ok || !lovedRes.ok) throw new Error("Could not load games");
+        return Promise.all([criticsRes.json(), lovedRes.json()]);
       })
-      .then((data) => {
+      .then(([criticsData, lovedData]) => {
         if (cancelled) return;
-        setCriticsChoice(data.criticsChoice || []);
-        setMostLoved(data.mostLoved || []);
+        setCriticsChoice(criticsData.games || []);
+        setMostLoved(lovedData.games || []);
         setError(false);
       })
       .catch(() => { if (!cancelled) setError(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
-
   const games = tab === "critics" ? criticsChoice : mostLoved;
-
   return (
     <>
       <Navbar />
@@ -123,7 +120,6 @@ export default function DiscoverClient() {
             </motion.div>
           </div>
         </section>
-
         <section className="mx-auto max-w-7xl px-5 py-9 sm:py-12">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div><p className="text-[11px] font-bold uppercase tracking-[0.25em] text-zinc-500">THE COLLECTIONS</p><h2 className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">{tab === "critics" ? "The ones critics remember" : "Loved for a reason"}</h2></div>

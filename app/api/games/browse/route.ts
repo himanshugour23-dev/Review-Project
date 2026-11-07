@@ -1,50 +1,83 @@
-import { connectToDatabase } from "@/lib/db";
-import Game from "@/models/game";
-import { NextResponse } from "next/server";
-import { platform } from "os";
 
-export async function GET(req: Request) {
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/lib/db";
+import IGDBGame from "@/models/igdbGames";
+
+export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
+    const { searchParams } = req.nextUrl;
+    const parsePositiveInt = (
+      value: string | null,
+      fallback: number
+    ) => {
+      const parsed = Number(value);
+      return Number.isSafeInteger(parsed) && parsed > 0
+        ? parsed
+        : fallback;
+    };
 
-    const { searchParams } = new URL(req.url);
+    const page = parsePositiveInt(
+      searchParams.get("page"),
+      1
+    );
 
-    const page = Math.max(Number(searchParams.get("page")) || 1, 1);
     const limit = Math.min(
-      Math.max(Number(searchParams.get("limit")) || 20, 1),
+      parsePositiveInt(searchParams.get("limit"), 20),
       50
     );
+
     const skip = (page - 1) * limit;
 
-    // Fetch paginated games with popularity ranking
     const [games, total] = await Promise.all([
-      Game.aggregate([
+      IGDBGame.aggregate([
         {
           $addFields: {
             priority: {
               $cond: [
                 {
                   $and: [
-                    { $gte: ["$metacritic", 50] },
-                    { $gte: ["$rawgRating", 3] },
-                    { $gte: ["$averageRating", 4] },
+                    { $gte: ["$metacritic", 75] },
+                    { $gte: ["$igdbRating", 75] },
+                    { $gte: ["$igdbRatingCount", 10] },
                   ],
                 },
-                1, 
-                0, 
+                1,
+                0,
               ],
+            },
+
+            communityScore: {
+              $cond: [
+                { $gt: ["$reviewCount", 0] },
+                { $ifNull: ["$averageRating", 0] },
+                0,
+              ],
+            },
+
+            criticScore: {
+              $ifNull: ["$metacritic", 0],
+            },
+
+            userScore: {
+              $ifNull: ["$igdbRating", 0],
+            },
+
+            ratingVotes: {
+              $ifNull: ["$igdbRatingCount", 0],
             },
           },
         },
 
-     
         {
           $sort: {
             priority: -1,
-            averageRating: -1,
-            metacritic: -1,
-            rawgRating: -1,
+            communityScore: -1,
+            criticScore: -1,
+            userScore: -1,
+            ratingVotes: -1,
             released: -1,
+            _id: 1,
           },
         },
 
@@ -55,29 +88,38 @@ export async function GET(req: Request) {
           $project: {
             name: 1,
             slug: 1,
+            igdbId: 1,
             coverImage: 1,
-            metacritic: 1,
-            averageRating: 1,
-            rawgRating: 1,
             released: 1,
-            platform : 1
+            genres: 1,
+            platforms: 1,
+            metacritic: 1,
+            igdbRating: 1,
+            igdbRatingCount: 1,
+            totalRating: 1,
+            totalRatingCount: 1,
+            averageRating: 1,
+            reviewCount: 1,
+            priority: 1,
           },
         },
-      ]).allowDiskUse(true),
-      Game.countDocuments(),
+      ]),
+      IGDBGame.countDocuments(),
     ]);
-
+    const totalPages = Math.ceil(total / limit);
     return NextResponse.json({
       page,
       limit,
       total,
-      totalPages: Math.ceil(total / limit),
-      hasNextPage: page < Math.ceil(total / limit),
+      totalPages,
+      hasNextPage: page < totalPages,
       games,
     });
   } catch (error) {
+    console.error("Browse API error:", error);
+
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { error: "Failed to fetch browse games" },
       { status: 500 }
     );
   }

@@ -87,7 +87,14 @@ export default function PublicProfilePage() {
             <div className="relative mx-auto md:mx-0">
               <div className="absolute -inset-3 rotate-6 rounded-[2rem] border border-[#d9ff70]/20" />
               <div className="relative h-32 w-32 overflow-hidden rounded-[1.65rem] bg-[#1b1d23] ring-1 ring-white/15 sm:h-44 sm:w-44">
-                <Image src={user.avatar || "/avatar-placeholder.png"} alt={user.name} fill unoptimized sizes="176px" className="object-cover" />
+                <img
+                  src={user.avatar}
+                  alt={user.name}
+                  className="h-full w-full rounded-[1.65rem] object-cover"
+                  referrerPolicy="no-referrer"
+                  onLoad={() => console.log("Avatar loaded successfully")}
+                  onError={() => console.error("Google avatar failed to load:", user.avatar)}
+                />
               </div>
               <span className="absolute -bottom-3 -right-3 grid h-10 w-10 place-items-center rounded-full border-4 border-[#101116] bg-[#d9ff70] text-black"><Sparkles size={16} /></span>
             </div>

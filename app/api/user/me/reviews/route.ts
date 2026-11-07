@@ -1,7 +1,7 @@
 import { NextResponse , NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { connectToDatabase } from "@/lib/db";
-import Game from "@/models/game";
+import igdbGames from "@/models/igdbGames";
 import Review from "@/models/review";
 
 export async function GET(req:NextRequest)
@@ -14,11 +14,11 @@ export async function GET(req:NextRequest)
                await connectToDatabase() ; 
 
                const reviews = await Review.find({userId : token.userId})
-               .populate({path : "gameId", model : Game , select :"name slug coverImage released "})
+               .populate({path : "gameId", model : igdbGames , select :"name slug coverImage released "})
                .sort({createdAt : -1})
                .lean() ; 
                return NextResponse.json(reviews)
-        } catch (error) {
+        } catch (error) {     
             console.log("My review Error ")
               return NextResponse.json(
                 { error: "Something went wrong" },

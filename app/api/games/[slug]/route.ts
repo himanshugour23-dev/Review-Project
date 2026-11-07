@@ -1,38 +1,32 @@
 import { NextResponse, NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
-import Game from "@/models/game";
+import IGDBGame from "@/models/igdbGames";
 import Review from "@/models/review";
 import User from "@/models/User";
 import ReviewReaction from "@/models/reviewReaction";
 import { getToken } from "next-auth/jwt";
-import { getRawgGameDetails, getRawgGameDLC } from "@/lib/rawg";
+import {
+  getIGDBGameDetails,
+  getIGDBGameDLC,
+} from "@/lib/igdb";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+export async function GET(req: NextRequest,{ params }: { params: Promise<{ slug: string }> }
 ) {
   try {
     await connectToDatabase();
-
     const { slug } = await params;
-
     const [gameResult, token] = await Promise.all([
-      Game.findOne({ slug }).lean(),
+      IGDBGame.findOne({ slug }).lean(),
       getToken({ req }),
     ]);
-
     if (!gameResult) {
       return NextResponse.json(
         { error: "Game not found" },
         { status: 404 }
       );
     }
-
-    let game = gameResult;
-
-    const userPromise =
-      token?.userId && token?.provider && token?.providerId
-        ? User.findOne({
+    let game: any = gameResult;
+    const userPromise = token?.userId && token?.provider && token?.providerId ? User.findOne({
             provider: token.provider as "google" | "github",
             providerId: token.providerId,
           }).lean()
@@ -54,86 +48,121 @@ export async function GET(
       reviewsPromise,
     ]);
 
-    let isPremium = false;
+    const expiresAt = user?.subscription?.expiresAt;
 
-    if (user) {
-      const expiresAt = user.subscription?.expiresAt;
+    const isPremium = user?.subscription?.isPremium === true &&!!expiresAt && new Date(expiresAt) > new Date();
 
-      isPremium =
-        user.subscription?.isPremium === true &&
-        !!expiresAt &&
-        expiresAt > new Date();
-    }
+    const needsRefresh = !game.detailsFetched;
 
-    if (isPremium && !game.rawgDetails) {
-      try {
-        const [details, dlc] = await Promise.all([
-          getRawgGameDetails(game.rawgId),
-          getRawgGameDLC(game.rawgId),
-        ]);
+    if (needsRefresh) {
+      const [detailsResult, dlcResult] = await Promise.allSettled([
+        getIGDBGameDetails(game.igdbId),
+        getIGDBGameDLC(game.igdbId),
+      ]);
 
-        const rawgDetails = {
-          developers:
-            details.developers?.map((developer: any) => ({
-              id: developer.id,
-              name: developer.name,
-              slug: developer.slug,
-            })) ?? [],
+      const update: Record<string, any> = {};
 
+      if ( detailsResult.status === "fulfilled" && detailsResult.value) {
+        const details = detailsResult.value;
+        update.summary = details.summary ?? game.summary;
+        update.storyline = details.storyline ?? game.storyline;
+        update.totalRating =details.totalRating ?? game.totalRating;
+        update.totalRatingCount =details.totalRatingCount ?? game.totalRatingCount;
+
+        update.igdbRating =details.igdbRating ?? game.igdbRating;
+
+        update.igdbRatingCount =details.igdbRatingCount ?? game.igdbRatingCount;
+        update.metacritic =details.metacritic ?? game.metacritic;
+        update.aggregatedRatingCount =details.aggregatedRatingCount ??game.aggregatedRatingCount;
+        update.hypes = details.hypes ?? game.hypes;
+        update.category = details.category ?? game.category;
+        update.parentGameId =details.parentGameId ?? game.parentGameId;
+        update.genres = details.genres ?? game.genres;
+        update.platforms = details.platforms ?? game.platforms;
+        update.themes = details.themes ?? game.themes;
+        update.gameModes = details.gameModes ?? game.gameModes;
+        update.playerPerspectives =
+          details.playerPerspectives ?? game.playerPerspectives;
+        update.keywords = details.keywords ?? game.keywords;
+        update.franchises = details.franchises ?? game.franchises;
+        update.screenshots = details.screenshots?.length
+          ? details.screenshots
+          : game.screenshots ?? [];
+
+        update.videos = details.videos?.length
+          ? details.videos
+          : game.videos ?? [];
+
+        update.similarGames = details.similarGames?.length
+          ? details.similarGames
+          : game.similarGames ?? [];
+        update.artworks = details.artworks?.length? details.artworks: game.artworks ?? [];
+
+        // Developers and publishers are stored for premium users.
+        update.igdbDetails = {...game.igdbDetails,developers:
+            details.igdbDetails?.developers ??
+            game.igdbDetails?.developers ??
+            [],
           publishers:
-            details.publishers?.map((publisher: any) => ({
-              id: publisher.id,
-              name: publisher.name,
-              slug: publisher.slug,
-            })) ?? [],
+            details.igdbDetails?.publishers ??
+            game.igdbDetails?.publishers ??
+            [],
 
-          stores:
-            details.stores?.map((store: any) => ({
-              id: store.store?.id,
-              name: store.store?.name,
-              slug: store.store?.slug,
-              url: store.url,
-            })) ?? [],
+          websites:
+            details.igdbDetails?.websites ??
+            game.igdbDetails?.websites ??
+            [],
 
-          dlc:
-            dlc?.map((item: any) => ({
-              id: item.id,
-              name: item.name,
-              slug: item.slug,
-              released: item.released
-                ? new Date(item.released)
-                : undefined,
-              image: item.background_image,
-            })) ?? [],
+          dlc: game.igdbDetails?.dlc ?? [],
         };
+        update.detailsFetched = true;
+      }
 
-        await Game.findByIdAndUpdate(game._id, {
-          $set: {
-            rawgDetails,
-          },
-        });
+      if (dlcResult.status === "fulfilled" && dlcResult.value) {
+        update.igdbDetails = {
+          ...game.igdbDetails,
+          ...update.igdbDetails,
+          dlc: dlcResult.value,
+        };
+      }
 
+      if (detailsResult.status === "fulfilled" || dlcResult.status === "fulfilled") {
+        update.lastFetched = new Date();
+        await IGDBGame.findByIdAndUpdate(
+          game._id,
+          { $set: update }
+        );
         game = {
           ...game,
-          rawgDetails,
+          ...update,
         };
-      } catch (rawgError) {
-        console.error("RAWG details fetch failed:", rawgError);
+      }
+
+      if (detailsResult.status === "rejected") {
+        console.error(
+          "IGDB game details fetch failed:",
+          detailsResult.reason
+        );
+      }
+
+      if (dlcResult.status === "rejected") {
+        console.error(
+          "IGDB DLC fetch failed:",
+          dlcResult.reason
+        );
       }
     }
 
-    const reviewIds = reviews.map((review) => review._id);
-
+    const reviewIds = reviews.map(
+      (review: any) => review._id
+    );
     const userId = token?.userId || null;
-
     const reactionCountsPromise =
       reviewIds.length > 0
         ? ReviewReaction.aggregate([
             {
               $match: {
-                reviewId: {
-                  $in: reviewIds,
-                },
+                reviewId: { $in: reviewIds },
               },
             },
             {
@@ -142,21 +171,18 @@ export async function GET(
                   reviewId: "$reviewId",
                   type: "$type",
                 },
-                count: {
-                  $sum: 1,
-                },
+                count: { $sum: 1 },
               },
             },
           ])
         : Promise.resolve([]);
 
+
     const myReactionsPromise =
       userId && reviewIds.length > 0
         ? ReviewReaction.find({
             userId,
-            reviewId: {
-              $in: reviewIds,
-            },
+            reviewId: { $in: reviewIds },
           }).select("reviewId type")
         : Promise.resolve([]);
 
@@ -165,12 +191,10 @@ export async function GET(
       myReactionsPromise,
     ]);
 
+    // Build reaction count map.
     const countMap: Record<
       string,
-      {
-        likes: number;
-        dislikes: number;
-      }
+      { likes: number; dislikes: number }
     > = {};
 
     for (const reaction of reactionCounts) {
@@ -192,6 +216,7 @@ export async function GET(
       }
     }
 
+    // Build current user's reaction map.
     const myReactions: Record<
       string,
       "like" | "dislike"
@@ -202,7 +227,8 @@ export async function GET(
         reaction.type;
     }
 
-    const enrichedReviews = reviews.map((review) => {
+    // Enrich reviews.
+    const enrichedReviews = reviews.map((review: any) => {
       const id = review._id.toString();
 
       return {
@@ -213,8 +239,24 @@ export async function GET(
       };
     });
 
+    // Remove premium-only fields for free users.
+    const responseGame = {
+      ...game,
+      igdbDetails: game.igdbDetails
+        ? { ...game.igdbDetails }
+        : game.igdbDetails,
+    };
+
+    if (!isPremium) {
+      delete responseGame.artworks;
+      if (responseGame.igdbDetails) {
+        delete responseGame.igdbDetails.developers;
+        delete responseGame.igdbDetails.publishers;
+      }
+    }
+
     return NextResponse.json({
-      game,
+      game: responseGame,
       reviews: enrichedReviews,
     });
   } catch (error) {

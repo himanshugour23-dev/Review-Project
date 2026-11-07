@@ -1,24 +1,26 @@
 'use client';
-
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpRight, Gamepad2, Heart, ChevronLeft, ChevronRight, Sparkles, Trophy } from 'lucide-react';
-
 type DiscoverType = 'critics' | 'most-loved';
-
 interface Game {
   _id: string;
   name: string;
   slug: string;
   coverImage: string;
   metacritic?: number;
-  rawgRating?: number;
+  igdbRating?: number;
+  igdbRatingCount?: number;
+  aggregatedRatingCount?: number;
+  averageRating?: number;
+  reviewCount?: number;
+  released?: string;
 }
-
 function GameCard({ game, index, active }: { game: Game; index: number; active: DiscoverType }) {
-  const score = active === 'critics' ? game.metacritic : game.rawgRating;
+  const rawScore = active === 'critics' ? game.metacritic : game.igdbRating;
+  const score = typeof rawScore === 'number' ? `${(rawScore / 20).toFixed(1)}/5` : '—';
   return (
     <motion.article initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.035, 0.28), duration: 0.35 }} className="min-w-0">
       <Link href={`/game/${game.slug}`} className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d9ff70] focus-visible:ring-offset-4 focus-visible:ring-offset-[#08090c]">
@@ -31,7 +33,7 @@ function GameCard({ game, index, active }: { game: Game; index: number; active: 
           </div>
           <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4">
             <h3 className="line-clamp-2 text-sm font-bold leading-snug text-white sm:text-base">{game.name}</h3>
-            <div className="mt-3 flex items-center justify-between gap-2"><span className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-semibold ${active === 'critics' ? 'border-[#d9ff70]/20 bg-[#d9ff70]/10 text-[#d9ff70]' : 'border-[#d9ff70]/20 bg-[#d9ff70]/10 text-[#d9ff70]'}`}>{active === 'critics' ? <Trophy size={12} /> : <Heart size={12} fill="currentColor" />}{score ?? '—'}</span><span className="text-xs font-medium text-zinc-300">{game.metacritic !== undefined && active === 'critics' ? 'Metacritic' : active === 'most-loved' ? 'RAWG rating' : 'Score'}</span></div>
+            <div className="mt-3 flex items-center justify-between gap-2"><span className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-semibold ${active === 'critics' ? 'border-[#d9ff70]/20 bg-[#d9ff70]/10 text-[#d9ff70]' : 'border-[#d9ff70]/20 bg-[#d9ff70]/10 text-[#d9ff70]'}`}>{active === 'critics' ? <Trophy size={12} /> : <Heart size={12} fill="currentColor" />}{score ?? '—'}</span><span className="text-xs font-medium text-zinc-300">{active === 'critics' ? 'IGDB critic' : 'IGDB user'}</span></div>
           </div>
           <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/5 transition group-hover:ring-[#d9ff70]/30" />
         </div>
@@ -39,11 +41,9 @@ function GameCard({ game, index, active }: { game: Game; index: number; active: 
     </motion.article>
   );
 }
-
 function LoadingGrid() {
   return <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{Array.from({ length: 12 }).map((_, i) => <div key={i} className="animate-pulse overflow-hidden rounded-2xl border border-white/[0.06] bg-zinc-950"><div className="aspect-[2/3] bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-800" /><div className="space-y-2 p-3"><div className="h-3 w-4/5 rounded bg-zinc-800" /><div className="h-3 w-2/5 rounded bg-zinc-900" /></div></div>)}</div>;
 }
-
 export default function DiscoverPage() {
   const [active, setActive] = useState<DiscoverType>('critics');
   const [page, setPage] = useState(1);
@@ -51,7 +51,6 @@ export default function DiscoverPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-
   useEffect(() => {
     let cancelled = false;
     async function fetchGames() {
@@ -74,9 +73,7 @@ export default function DiscoverPage() {
     fetchGames();
     return () => { cancelled = true; };
   }, [active, page]);
-
   const switchTo = (type: DiscoverType) => { setActive(type); setPage(1); };
-
   return (
     <div className="min-h-screen overflow-hidden bg-[#08090c] text-white">
       <section className="relative isolate overflow-hidden border-b border-white/[0.08]">
@@ -94,19 +91,17 @@ export default function DiscoverPage() {
           </motion.div>
         </div>
       </section>
-
       <main className="mx-auto max-w-7xl px-5 py-9 sm:py-12">
         {err && <div role="alert" className="mb-6 rounded-2xl border border-red-400/20 bg-red-400/[0.06] p-4 text-sm text-red-200">{err}</div>}
         <div className="mb-6 flex items-end justify-between gap-4"><div><p className="text-[11px] font-bold uppercase tracking-[0.25em] text-zinc-500">Page {page} of {totalPages}</p><h2 className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">{active === 'critics' ? 'The ones critics remember' : 'Loved for a reason'}</h2></div>{!loading && !err && <p className="text-xs text-zinc-500">{games.length} titles on this page</p>}</div>
         {loading ? <LoadingGrid /> : !err && games.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-16 text-center"><Gamepad2 className="mx-auto text-zinc-600" size={32} /><p className="mt-4 font-semibold text-zinc-300">No games found</p><p className="mt-1 text-sm text-zinc-500">There aren’t any titles in this collection right now.</p></div> : !err && <AnimatePresence mode="wait"><motion.div key={`${active}-${page}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.22 }} className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{games.map((game, index) => <GameCard key={game._id || `${game.slug}-${index}`} game={game} index={index} active={active} />)}</motion.div></AnimatePresence>}
-
         {!loading && !err && games.length > 0 && <div className="mt-14 flex flex-col items-center gap-5">
           <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-2 shadow-xl shadow-black/20 backdrop-blur">
             <button aria-label="Previous page" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[0.04] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-25"><ChevronLeft size={18} /></button>
             <div className="min-w-20 px-2 text-center"><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-500">Page</p><p className="mt-0.5 text-base font-bold tabular-nums">{page}<span className="mx-2 text-zinc-600">/</span>{totalPages}</p></div>
             <button aria-label="Next page" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[0.04] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-25"><ChevronRight size={18} /></button>
           </div>
-          <p className="text-center text-xs text-zinc-500">{active === 'critics' ? 'Ranked by Metacritic score.' : 'Ranked by RAWG community rating.'}</p>
+          <p className="text-center text-xs text-zinc-500">{active === 'critics' ? 'Ranked by IGDB critic rating.' : 'Ranked by IGDB user rating.'}</p>
         </div>}
       </main>
     </div>

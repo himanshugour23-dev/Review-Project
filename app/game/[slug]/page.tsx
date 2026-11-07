@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -8,36 +8,14 @@ import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import Rating from "@mui/material/Rating";
 import {
-  ArrowLeft,
-  ArrowUpRight,
-  CalendarDays,
-  Check,
-  CircleHelp,
-  ExternalLink,
-  Gamepad2,
-  Heart,
-  MessageCircle,
-  Send,
-  Sparkles,
-  Star,
-  ThumbsDown,
-  ThumbsUp,
-  Trophy,
-  UserRound,
+  ArrowLeft, ArrowUpRight, CalendarDays, Check, ChevronLeft, ChevronRight, CircleHelp, ExternalLink, Gamepad2, Heart,
+  Lock, MessageCircle, Play, Send, Sparkles, Star, ThumbsDown, ThumbsUp, Trophy, UserRound,
 } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
 import SleepLoader from "@/components/SleepLoader";
 
-type PremiumTab = "info" | "dlc";
+type PremiumTab = "info" | "dlc" | "media";
 
 interface GamePageData {
   _id: string;
@@ -45,59 +23,106 @@ interface GamePageData {
   slug: string;
   coverImage: string;
   released?: string;
-  metacritic?: number;
   averageRating?: number;
   genres?: string[];
   platforms?: string[];
-  rawgDetails?: {
+  playtime?: number;
+  // IGDB fields
+  metacritic?: number; // critic score (aggregated_rating, 0-100)
+  aggregatedRatingCount?: number;
+  igdbRating?: number;
+  igdbRatingCount?: number;
+  totalRating?: number;
+  totalRatingCount?: number;
+  hypes?: number;
+  category?: number; // IGDB game_type
+  parentGameId?: number;
+  summary?: string;
+  storyline?: string;
+  themes?: string[];
+  gameModes?: string[];
+  playerPerspectives?: string[];
+  keywords?: string[];
+  franchises?: string[];
+  screenshots?: string[];
+  artworks?: string[]; // premium only (route strips it for free users)
+  videos?: { name?: string; videoId: string }[];
+  similarGames?: { id?: string | number; name: string; slug?: string; coverImage?: string }[];
+  igdbDetails?: {
+    // developers / publishers are removed by the route for free users
     developers?: { name: string }[];
     publishers?: { name: string }[];
-    stores?: { id?: string | number; name: string; url?: string }[];
-    dlc?: {
-      id?: string | number;
-      slug: string;
-      name: string;
-      image?: string;
-      released?: string;
-    }[];
+    websites?: { id?: string | number; type?: number; url: string }[];
+    dlc?: { id?: string | number; slug: string; name: string; image?: string; released?: string }[];
   };
-  [key: string]: any;
 }
 
 interface ReviewData {
   _id: string;
-  userId: {
-    _id: string;
-    name: string;
-    avatar?: string;
-  };
+  userId: { _id: string; name: string; avatar?: string };
   rating: number;
   reviewText?: string;
   likes?: number;
   dislikes?: number;
   reaction?: "like" | "dislike" | null;
-  [key: string]: any;
 }
 
+// IGDB game_type -> label (main game is not badged)
+const GAME_TYPES: Record<number, string> = {
+  1: "DLC", 2: "Expansion", 3: "Bundle", 4: "Standalone expansion",
+  8: "Remake", 9: "Remaster", 10: "Expanded game", 11: "Port",
+};
+
+const STORE_HOSTS: Record<string, string> = {
+  "store.steampowered.com": "Steam", "steampowered.com": "Steam", "gog.com": "GOG",
+  "epicgames.com": "Epic Games", "playstation.com": "PlayStation", "xbox.com": "Xbox",
+  "microsoft.com": "Microsoft Store", "nintendo.com": "Nintendo", "itch.io": "itch.io",
+  "apps.apple.com": "App Store", "play.google.com": "Google Play", "humblebundle.com": "Humble",
+};
+
+const SOCIAL_HOSTS = [
+  "facebook.com", "twitter.com", "x.com", "instagram.com", "youtube.com", "twitch.tv", "reddit.com",
+  "discord.com", "discord.gg", "wikipedia.org", "fandom.com", "wikia.com",
+];
+
+const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+
+// UTC keeps server/client output identical and avoids off-by-one dates.
 const formatDate = (value?: string) => {
   if (!value) return "Release date unknown";
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "Release date unknown"
-    : date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
+    : date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 };
 
 const initials = (name?: string) =>
-  (name || "Player")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
+  (name || "Player").split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
+
+/** Accepts an IGDB image_id, a protocol-less url ("//images.igdb.com/...") or a full url, and returns a full url at the requested size. */
+const igdbImage = (value?: string, size = "t_cover_big") => {
+  if (!value) return undefined;
+  if (/^https?:\/\//.test(value) || value.startsWith("//")) {
+    const absolute = value.startsWith("//") ? `https:${value}` : value;
+    return absolute.includes("images.igdb.com") ? absolute.replace(/\/t_[a-z0-9_]+\//, `/${size}/`) : absolute;
+  }
+  return `https://images.igdb.com/igdb/image/upload/${size}/${value}.jpg`;
+};
+
+const hostMatches = (host: string, key: string) => host === key || host.endsWith(`.${key}`);
+
+// IGDB websites have no name, so derive one from the url.
+const describeWebsite = (url: string) => {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    const store = Object.keys(STORE_HOSTS).find((key) => hostMatches(host, key));
+    if (store) return { name: STORE_HOSTS[store], kind: "store" as const };
+    if (SOCIAL_HOSTS.some((key) => hostMatches(host, key))) return { name: host, kind: "social" as const };
+    return { name: host, kind: "other" as const };
+  } catch {
+    return { name: url, kind: "social" as const };
+  }
+};
 
 export default function GamePage() {
   const params = useParams<{ slug: string }>();
@@ -110,13 +135,13 @@ export default function GamePage() {
   const [reviewText, setReviewText] = useState("");
   const [loading, setLoading] = useState(true);
   const [premiumTab, setPremiumTab] = useState<PremiumTab>("info");
+  const [aboutExpanded, setAboutExpanded] = useState(false);
+  const shotsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!slug) return;
-
     const controller = new AbortController();
     setLoading(true);
-
     fetch(`/api/games/${slug}`, { signal: controller.signal, cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) throw new Error("Unable to load this game.");
@@ -135,30 +160,26 @@ export default function GamePage() {
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
-
     return () => controller.abort();
   }, [slug]);
 
   useEffect(() => {
     if (!session?.user?.id || reviews.length === 0) return;
-
-    const existingReview = reviews.find(
-      (review) => review.userId?._id === session.user.id,
-    );
-
+    const existingReview = reviews.find((review) => review.userId?._id === session.user.id);
     if (existingReview) {
       setRating(existingReview.rating);
       setReviewText(existingReview.reviewText ?? "");
     }
   }, [session, reviews]);
 
-  const addToFavourite = async () => {
-    if (!session) {
-      toast.error("Login required");
-      return;
-    }
-    if (!game) return;
+  const scrollShots = (direction: 1 | -1) => {
+    const el = shotsRef.current;
+    if (el) el.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: "smooth" });
+  };
 
+  const addToFavourite = async () => {
+    if (!session) return toast.error("Login required");
+    if (!game) return;
     try {
       const res = await fetch("/api/user/me/favourite/add", {
         method: "POST",
@@ -173,15 +194,9 @@ export default function GamePage() {
   };
 
   const submitReview = async () => {
-    if (!session) {
-      toast.error("Login required");
-      return;
-    }
+    if (!session) return toast.error("Login required");
     if (!game) return;
-    if (!rating) {
-      toast.error("Select a rating first");
-      return;
-    }
+    if (!rating) return toast.error("Select a rating first");
 
     const toastId = toast.loading("Submitting your review...");
     try {
@@ -190,18 +205,13 @@ export default function GamePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gameId: game._id, rating, reviewText }),
       });
-
       if (!res.ok) {
         toast.error("Submission failed", { id: toastId });
         return;
       }
-
-      const updatedResponse = await fetch(`/api/games/${slug}`, {
-        cache: "no-store",
-      });
+      const updatedResponse = await fetch(`/api/games/${slug}`, { cache: "no-store" });
       if (!updatedResponse.ok) throw new Error("Could not refresh reviews.");
       const updated = await updatedResponse.json();
-
       setReviews(updated?.reviews ?? []);
       setGame(updated?.game ?? game);
       setReviewText("");
@@ -213,40 +223,26 @@ export default function GamePage() {
   };
 
   const reactToReview = async (reviewId: string, type: "like" | "dislike") => {
-    if (!session) {
-      toast.error("Login required to react");
-      return;
-    }
+    if (!session) return toast.error("Login required to react");
 
     setReviews((current) =>
       current.map((review) => {
         if (review._id !== reviewId) return review;
-
         if (type === "like") {
           const removingLike = review.reaction === "like";
           return {
             ...review,
             reaction: removingLike ? null : "like",
             likes: Math.max((review.likes || 0) + (removingLike ? -1 : 1), 0),
-            dislikes: Math.max(
-              (review.dislikes || 0) - (review.reaction === "dislike" ? 1 : 0),
-              0,
-            ),
+            dislikes: Math.max((review.dislikes || 0) - (review.reaction === "dislike" ? 1 : 0), 0),
           };
         }
-
         const removingDislike = review.reaction === "dislike";
         return {
           ...review,
           reaction: removingDislike ? null : "dislike",
-          dislikes: Math.max(
-            (review.dislikes || 0) + (removingDislike ? -1 : 1),
-            0,
-          ),
-          likes: Math.max(
-            (review.likes || 0) - (review.reaction === "like" ? 1 : 0),
-            0,
-          ),
+          dislikes: Math.max((review.dislikes || 0) + (removingDislike ? -1 : 1), 0),
+          likes: Math.max((review.likes || 0) - (review.reaction === "like" ? 1 : 0), 0),
         };
       }),
     );
@@ -264,11 +260,7 @@ export default function GamePage() {
   };
 
   const reportReview = async (reviewId: string) => {
-    if (!session) {
-      toast.error("Login required to report");
-      return;
-    }
-
+    if (!session) return toast.error("Login required to report");
     try {
       const res = await fetch("/api/reports", {
         method: "POST",
@@ -295,21 +287,14 @@ export default function GamePage() {
   const orderedReviews = useMemo(() => {
     const ordered = [...reviews];
     if (session?.user?.id) {
-      const index = ordered.findIndex(
-        (review) => review.userId?._id === session.user.id,
-      );
+      const index = ordered.findIndex((review) => review.userId?._id === session.user.id);
       if (index > -1) ordered.unshift(...ordered.splice(index, 1));
     }
     return ordered;
   }, [reviews, session]);
 
-  const writtenReviews = orderedReviews.filter(
-    (review) => review.reviewText && review.reviewText.trim().length > 0,
-  );
-  const ownReviewExists = reviews.some(
-    (review) => review.userId?._id === session?.user?.id,
-  );
-  const dlcList = game?.rawgDetails?.dlc ?? [];
+  const writtenReviews = orderedReviews.filter((review) => review.reviewText?.trim());
+  const ownReviewExists = reviews.some((review) => review.userId?._id === session?.user?.id);
 
   if (loading) {
     return (
@@ -326,17 +311,10 @@ export default function GamePage() {
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-[#d9ff70]/20 bg-[#d9ff70]/5 text-[#d9ff70]">
             <CircleHelp size={28} />
           </div>
-          <p className="mt-6 text-xs font-bold uppercase tracking-[0.3em] text-[#d9ff70]">
-            Lost in the backlog
-          </p>
+          <p className="mt-6 text-xs font-bold uppercase tracking-[0.3em] text-[#d9ff70]">Lost in the backlog</p>
           <h1 className="mt-3 text-3xl font-black tracking-tight">Game not found.</h1>
-          <p className="mt-3 text-sm leading-6 text-white/50">
-            This page may have moved, or the game is no longer available.
-          </p>
-          <Link
-            href="/discover"
-            className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#d9ff70] px-5 py-3 text-sm font-bold text-[#08090c] transition hover:bg-white"
-          >
+          <p className="mt-3 text-sm leading-6 text-white/50">This page may have moved, or the game is no longer available.</p>
+          <Link href="/discover" className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#d9ff70] px-5 py-3 text-sm font-bold text-[#08090c] transition hover:bg-white">
             <ArrowLeft size={16} /> Back to discovery
           </Link>
         </div>
@@ -344,21 +322,66 @@ export default function GamePage() {
     );
   }
 
+  // ---- derived IGDB data (no hooks below this line) ----
+  const details = game.igdbDetails;
+  const dlcList = details?.dlc ?? [];
+  const developers = details?.developers; // undefined => locked (free user)
+  const publishers = details?.publishers;
+
+  const websites = (details?.websites ?? [])
+    .filter((site) => !!site?.url)
+    .map((site) => ({ ...site, ...describeWebsite(site.url) }))
+    .filter((site) => site.kind !== "social")
+    .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "store" ? -1 : 1))
+    .filter((site, index, all) => all.findIndex((other) => other.name === site.name) === index)
+    .slice(0, 8);
+
+  const screenshots = game.screenshots ?? [];
+  const videos = game.videos ?? [];
+  const similarGames = (game.similarGames ?? []).filter((item) => item.slug).slice(0, 12);
+
+  const coverUrl = igdbImage(game.coverImage, "t_cover_big");
+  const heroUrl = igdbImage(game.artworks?.[0], "t_1080p") ?? igdbImage(game.screenshots?.[0], "t_1080p") ?? coverUrl;
+
+  const criticScore = Math.round(Number(game.metacritic) || 0);
+  const igdbScore = Math.round(Number(game.totalRating) || Number(game.igdbRating) || 0);
+  const igdbVotes = Number(game.totalRatingCount) || Number(game.igdbRatingCount) || 0;
+  const criticVotes = Number(game.aggregatedRatingCount) || 0;
+  const hypes = Number(game.hypes) || 0;
+  const playtime = Math.round(Number(game.playtime) || 0);
+  const typeLabel = game.category !== undefined ? GAME_TYPES[game.category] : undefined;
+  const averageRating = Number(game.averageRating || 0);
+
+  const stats = [
+    criticScore > 0 && { label: "Critics", value: `${criticScore}`, sub: criticVotes ? `${compact.format(criticVotes)} reviews` : "score" },
+    igdbScore > 0 && { label: "IGDB", value: `${igdbScore}`, sub: igdbVotes ? `${compact.format(igdbVotes)} votes` : "score" },
+    hypes > 0 && { label: "Hype", value: compact.format(hypes), sub: "following" },
+    playtime > 0 && { label: "Playtime", value: `${playtime}h`, sub: "to beat" },
+  ].filter(Boolean) as { label: string; value: string; sub: string }[];
+
+  const hasAbout = !!(
+    game.summary || game.storyline || game.themes?.length || game.gameModes?.length ||
+    game.playerPerspectives?.length || game.franchises?.length || game.keywords?.length
+  );
+  const longAbout = (game.summary?.length ?? 0) + (game.storyline?.length ?? 0) > 450;
+
+  const tabButton = (tab: PremiumTab) =>
+    cn(
+      "relative -mb-px flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-1 pb-3 text-xs font-bold transition",
+      premiumTab === tab ? "border-[#d9ff70] text-[#d9ff70]" : "border-transparent text-white/40 hover:text-white",
+    );
+
+  const chip = "rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-white/70 backdrop-blur-md";
+  const eyebrow = "text-[9px] font-black uppercase tracking-[0.25em] text-white/30";
+  const arrowBtn = "flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:border-[#d9ff70]/40 hover:bg-[#d9ff70] hover:text-[#08090c] active:scale-95";
+
   return (
     <div className="min-h-screen overflow-hidden bg-[#08090c] text-white selection:bg-[#d9ff70] selection:text-[#08090c]">
       {/* Cinematic cover / editorial masthead */}
       <section className="relative isolate min-h-[520px] overflow-hidden sm:min-h-[620px]">
         <div className="absolute inset-0 -z-20">
-          {game.coverImage ? (
-            <Image
-              src={game.coverImage}
-              alt={`${game.name} artwork`}
-              fill
-              priority
-              unoptimized
-              sizes="100vw"
-              className="object-cover object-center opacity-55 blur-[1px]"
-            />
+          {heroUrl ? (
+            <Image src={heroUrl} alt={`${game.name} artwork`} fill loading="eager" unoptimized sizes="100vw" className="object-cover object-center opacity-55 blur-[1px]" />
           ) : null}
         </div>
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,#08090c_0%,rgba(8,9,12,.9)_32%,rgba(8,9,12,.36)_75%,rgba(8,9,12,.62)_100%)]" />
@@ -368,10 +391,7 @@ export default function GamePage() {
 
         <div className="mx-auto flex min-h-[520px] max-w-[1400px] flex-col justify-between px-5 pb-24 pt-28 sm:min-h-[620px] sm:px-8 sm:pb-32 lg:px-12">
           <div className="flex items-center justify-between gap-4">
-            <Link
-              href="/discover"
-              className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/55 transition hover:text-[#d9ff70]"
-            >
+            <Link href="/discover" className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/55 transition hover:text-[#d9ff70]">
               <ArrowLeft size={15} /> Back to the wild
             </Link>
             <span className="hidden items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-white/45 backdrop-blur-md sm:inline-flex">
@@ -381,21 +401,16 @@ export default function GamePage() {
           </div>
 
           <div className="grid items-end gap-10 md:grid-cols-[minmax(0,1fr)_190px] lg:grid-cols-[minmax(0,1fr)_230px]">
-            <div className="max-w-4xl">
+            <div className="min-w-0 max-w-4xl">
               <div className="mb-5 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-2 rounded-full border border-[#d9ff70]/25 bg-[#d9ff70]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#d9ff70]">
-                  <Gamepad2 size={13} /> Game file
+                  <Gamepad2 size={13} /> {typeLabel ?? "Game file"}
                 </span>
-                {game.metacritic !== undefined && game.metacritic !== null && (
-                  <span className="rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-white/70 backdrop-blur-md">
-                    Metacritic <span className="ml-1 text-white">{game.metacritic}</span>
-                  </span>
-                )}
+                {criticScore > 0 && <span className={chip}>Critics <span className="ml-1 text-white">{criticScore}</span></span>}
+                {igdbScore > 0 && <span className={chip}>IGDB <span className="ml-1 text-white">{igdbScore}</span></span>}
               </div>
-              <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.4em] text-white/40">
-                The next chapter is yours
-              </p>
-              <h1 className="max-w-5xl text-5xl font-black leading-[0.94] tracking-[-0.055em] sm:text-6xl md:text-7xl lg:text-[6.5rem]">
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.4em] text-white/40">The next chapter is yours</p>
+              <h1 className="max-w-5xl break-words text-5xl font-black leading-[0.94] tracking-[-0.055em] sm:text-6xl md:text-7xl lg:text-[6.5rem]">
                 {game.name}
                 <span className="text-[#d9ff70]">.</span>
               </h1>
@@ -416,15 +431,8 @@ export default function GamePage() {
               <div className="relative mx-auto w-full max-w-[230px] rotate-[2deg] transition duration-500 hover:rotate-0">
                 <div className="absolute -inset-2 rounded-[5px] border border-[#d9ff70]/30" />
                 <div className="relative aspect-[3/4] overflow-hidden rounded-[3px] bg-[#17181e] shadow-[0_24px_80px_rgba(0,0,0,.65)]">
-                  {game.coverImage ? (
-                    <Image
-                      src={game.coverImage}
-                      alt={game.name}
-                      fill
-                      unoptimized
-                      sizes="230px"
-                      className="object-cover transition duration-700 hover:scale-105"
-                    />
+                  {coverUrl ? (
+                    <Image src={coverUrl} alt={game.name} fill unoptimized sizes="230px" className="object-cover transition duration-700 hover:scale-105" />
                   ) : (
                     <div className="flex h-full items-center justify-center text-white/20"><Gamepad2 size={42} /></div>
                   )}
@@ -456,35 +464,43 @@ export default function GamePage() {
             </div>
             <div className="relative mt-8 flex flex-wrap items-end gap-x-5 gap-y-3">
               <div className="flex items-baseline gap-2">
-                <span className="text-6xl font-black leading-none tracking-[-0.07em] text-white sm:text-7xl">
-                  {Number(game.averageRating || 0).toFixed(1)}
-                </span>
+                <span className="text-6xl font-black leading-none tracking-[-0.07em] text-white sm:text-7xl">{averageRating.toFixed(1)}</span>
                 <span className="text-lg text-[#d9ff70]">/ 5</span>
               </div>
               <div className="pb-1">
                 <div className="flex items-center gap-1 text-[#d9ff70]">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <Star key={index} size={13} fill={index < Math.round(Number(game.averageRating || 0)) ? "currentColor" : "none"} className={index < Math.round(Number(game.averageRating || 0)) ? "" : "text-white/20"} />
-                  ))}
+                  {Array.from({ length: 5 }).map((_, index) => {
+                    const filled = index < Math.round(averageRating);
+                    return <Star key={index} size={13} fill={filled ? "currentColor" : "none"} className={filled ? "" : "text-white/20"} />;
+                  })}
                 </div>
                 <p className="mt-1 text-xs text-white/40">{reviews.length} {reviews.length === 1 ? "rating" : "ratings"} logged</p>
               </div>
             </div>
-            <div className="mt-8 flex flex-wrap gap-2">
-              {(game.genres ?? []).map((genre: string) => (
+
+            {stats.length > 0 && (
+              <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {stats.map((stat) => (
+                  <div key={stat.label} className="min-w-0 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-3">
+                    <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/35">{stat.label}</p>
+                    <p className="mt-1 text-xl font-black leading-none text-[#d9ff70]">{stat.value}</p>
+                    <p className="mt-1 truncate text-[10px] text-white/35">{stat.sub}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              {(game.genres ?? []).map((genre) => (
                 <span key={genre} className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-medium text-white/65 transition hover:border-[#d9ff70]/30 hover:text-[#d9ff70]">{genre}</span>
               ))}
             </div>
-            <div className="mt-7 border-t border-white/[0.08] pt-5">
+            <div className="mt-6 border-t border-white/[0.08] pt-5">
               <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/35">Available worlds</p>
               <p className="mt-2 text-sm leading-6 text-white/65">{game.platforms?.length ? game.platforms.join(" · ") : "Platform information unavailable"}</p>
             </div>
             {session && (
-              <button
-                type="button"
-                onClick={addToFavourite}
-                className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#d9ff70]/25 bg-[#d9ff70]/[0.08] px-4 py-2.5 text-xs font-bold text-[#d9ff70] transition hover:bg-[#d9ff70] hover:text-[#08090c]"
-              >
+              <button type="button" onClick={addToFavourite} className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#d9ff70]/25 bg-[#d9ff70]/[0.08] px-4 py-2.5 text-xs font-bold text-[#d9ff70] transition hover:bg-[#d9ff70] hover:text-[#08090c]">
                 <Heart size={15} /> Add to favourites <ArrowUpRight size={13} />
               </button>
             )}
@@ -500,7 +516,7 @@ export default function GamePage() {
               <span className="font-mono text-xs text-white/25">1 — 5 ★</span>
             </div>
             <div className="mt-5 h-[210px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <BarChart data={ratingData} margin={{ top: 10, right: 4, left: -24, bottom: 0 }}>
                   <XAxis dataKey="star" tick={{ fill: "#777b82", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `${value}★`} />
                   <YAxis hide allowDecimals={false} />
@@ -520,67 +536,147 @@ export default function GamePage() {
           </div>
         </section>
 
-        {/* Premium / extra insights */}
-        {game.rawgDetails && (
-          <section className="relative mt-6 overflow-hidden rounded-[1.75rem] border border-[#d9ff70]/15 bg-[#0e100d]">
-            <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-[#d9ff70]/[0.06] blur-[90px]" />
-            <div className="relative p-6 sm:p-8">
-              <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-                <div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#d9ff70]/25 bg-[#d9ff70]/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-[#d9ff70]"><Sparkles size={11} /> Extra signal</span>
-                    <span className="text-[10px] uppercase tracking-[0.22em] text-white/25">03 / Deep cuts</span>
+        {/* About: summary, storyline, game DNA */}
+        {hasAbout && (
+          <section className="mt-4 grid gap-4 lg:grid-cols-[1.4fr_.6fr]">
+            <div className="relative min-w-0 overflow-hidden rounded-[1.75rem] border border-white/[0.09] bg-[#101116] p-6 sm:p-8">
+              <div className="pointer-events-none absolute -left-16 -top-20 h-56 w-56 rounded-full bg-[#d9ff70]/[0.05] blur-[80px]" />
+              <div className="relative">
+                <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#d9ff70]">03 / The brief</p>
+                <h2 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">The short version.</h2>
+                {game.summary ? (
+                  <p className={cn("mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-white/60", !aboutExpanded && longAbout && "line-clamp-5")}>{game.summary}</p>
+                ) : (
+                  <p className="mt-4 text-sm text-white/35">No description available yet.</p>
+                )}
+                {game.storyline && (
+                  <div className="mt-6 border-t border-white/[0.08] pt-5">
+                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/35">Storyline</p>
+                    <p className={cn("mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-white/50", !aboutExpanded && longAbout && "line-clamp-3")}>{game.storyline}</p>
                   </div>
-                  <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Beyond the cover.</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">The people behind it, where to find it, and the worlds that came after.</p>
-                </div>
-                <Link href={`/game/${slug}/creators`} className="inline-flex items-center justify-center gap-2 self-start rounded-full bg-[#d9ff70] px-5 py-3 text-xs font-black text-[#08090c] transition hover:bg-white sm:self-auto">
-                  Meet the creators <ArrowUpRight size={15} />
-                </Link>
+                )}
+                {longAbout && (
+                  <button type="button" onClick={() => setAboutExpanded((value) => !value)} className="mt-4 text-xs font-bold text-[#d9ff70] transition hover:text-white">
+                    {aboutExpanded ? "Show less" : "Read more"}
+                  </button>
+                )}
               </div>
+            </div>
 
-              <div className="mt-8 flex gap-6 border-b border-white/10">
-                <button type="button" onClick={() => setPremiumTab("info")} className={cn("relative -mb-px flex items-center gap-2 border-b-2 px-1 pb-3 text-xs font-bold transition", premiumTab === "info" ? "border-[#d9ff70] text-[#d9ff70]" : "border-transparent text-white/40 hover:text-white")}>
-                  <CircleHelp size={14} /> Field notes
-                </button>
-                <button type="button" onClick={() => setPremiumTab("dlc")} className={cn("relative -mb-px flex items-center gap-2 border-b-2 px-1 pb-3 text-xs font-bold transition", premiumTab === "dlc" ? "border-[#d9ff70] text-[#d9ff70]" : "border-transparent text-white/40 hover:text-white")}>
-                  <Gamepad2 size={14} /> Expansion worlds <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[9px]">{dlcList.length}</span>
-                </button>
+            <div className="relative min-w-0 overflow-hidden rounded-[1.75rem] border border-white/[0.09] bg-[#101116] p-6 sm:p-8">
+              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#d9ff70]">Game DNA</p>
+              <div className="mt-5 space-y-5">
+                <ChipGroup label="Modes" items={game.gameModes} />
+                <ChipGroup label="Perspective" items={game.playerPerspectives} />
+                <ChipGroup label="Themes" items={game.themes} />
+                <ChipGroup label="Series" items={game.franchises} />
+                <ChipGroup label="Tags" items={game.keywords} limit={8} />
               </div>
+            </div>
+          </section>
+        )}
 
-              {premiumTab === "info" && (
-                <div className="grid gap-7 pt-6 sm:grid-cols-2 lg:grid-cols-3">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/30">Built by</p>
-                    <p className="mt-2 text-sm leading-6 text-white/75">{game.rawgDetails.developers?.length ? game.rawgDetails.developers.map((item: any) => item.name).join(", ") : "Developer information unavailable"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/30">Put out into the world by</p>
-                    <p className="mt-2 text-sm leading-6 text-white/75">{game.rawgDetails.publishers?.length ? game.rawgDetails.publishers.map((item: any) => item.name).join(", ") : "Publisher information unavailable"}</p>
-                  </div>
-                  <div className="sm:col-span-2 lg:col-span-1">
-                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/30">Find your copy</p>
-                    {game.rawgDetails.stores?.length ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {game.rawgDetails.stores.map((store: any) => store.url ? (
-                          <a key={store.id ?? store.name} href={store.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-[11px] text-white/65 transition hover:border-[#d9ff70]/30 hover:text-[#d9ff70]">{store.name}<ExternalLink size={11} /></a>
-                        ) : (
-                          <span key={store.id ?? store.name} className="rounded-full border border-white/10 px-3 py-2 text-[11px] text-white/40">{store.name}</span>
-                        ))}
-                      </div>
-                    ) : <p className="mt-2 text-sm text-white/40">No store links available.</p>}
-                  </div>
+        {/* Screenshots carousel */}
+        {screenshots.length > 0 && (
+          <section className="mt-4 overflow-hidden rounded-[1.75rem] border border-white/[0.09] bg-[#101116] p-6 sm:p-8">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#d9ff70]">04 / Frames</p>
+                <h2 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">Screenshots.</h2>
+                <p className="mt-2 text-sm text-white/45">{screenshots.length} {screenshots.length === 1 ? "frame" : "frames"} from the game. Tap one to open it full size.</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button type="button" onClick={() => scrollShots(-1)} aria-label="Previous screenshots" className={arrowBtn}><ChevronLeft size={18} /></button>
+                <button type="button" onClick={() => scrollShots(1)} aria-label="Next screenshots" className={arrowBtn}><ChevronRight size={18} /></button>
+              </div>
+            </div>
+            <div ref={shotsRef} className="mt-6 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {screenshots.map((shot, index) => {
+                const thumb = igdbImage(shot, "t_screenshot_big");
+                if (!thumb) return null;
+                return (
+                  <a
+                    key={`${shot}-${index}`}
+                    href={igdbImage(shot, "t_1080p")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative aspect-video w-[85%] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/[0.08] bg-[#17181e] transition hover:border-[#d9ff70]/30 sm:w-[48%] lg:w-[32%]"
+                  >
+                    <Image src={thumb} alt={`${game.name} screenshot ${index + 1}`} fill unoptimized sizes="(max-width: 640px) 85vw, (max-width: 1024px) 48vw, 32vw" className="object-cover transition duration-700 group-hover:scale-105" />
+                  </a>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Extra insights */}
+        <section className="relative mt-6 overflow-hidden rounded-[1.75rem] border border-[#d9ff70]/15 bg-[#0e100d]">
+          <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-[#d9ff70]/[0.06] blur-[90px]" />
+          <div className="relative p-6 sm:p-8">
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#d9ff70]/25 bg-[#d9ff70]/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-[#d9ff70]"><Sparkles size={11} /> Extra signal</span>
+                  <span className="text-[10px] uppercase tracking-[0.22em] text-white/25">05 / Deep cuts</span>
                 </div>
+                <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Beyond the cover.</h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-white/45">The people behind it, where to find it, and the worlds that came after.</p>
+              </div>
+              <Link href={`/game/${slug}/creators`} className="inline-flex items-center justify-center gap-2 self-start rounded-full bg-[#d9ff70] px-5 py-3 text-xs font-black text-[#08090c] transition hover:bg-white sm:self-auto">
+                Meet the creators <ArrowUpRight size={15} />
+              </Link>
+            </div>
+
+            <div className="mt-8 flex gap-6 overflow-x-auto border-b border-white/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <button type="button" onClick={() => setPremiumTab("info")} className={tabButton("info")}>
+                <CircleHelp size={14} /> Field notes
+              </button>
+              <button type="button" onClick={() => setPremiumTab("dlc")} className={tabButton("dlc")}>
+                <Gamepad2 size={14} /> Expansion worlds <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[9px]">{dlcList.length}</span>
+              </button>
+              {videos.length > 0 && (
+                <button type="button" onClick={() => setPremiumTab("media")} className={tabButton("media")}>
+                  <Play size={14} /> Trailers <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[9px]">{videos.length}</span>
+                </button>
               )}
+            </div>
 
-              {premiumTab === "dlc" && (
-                <div className="pt-6">
-                  {dlcList.length ? (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                      {dlcList.map((item: any) => (
+            {premiumTab === "info" && (
+              <div className="grid gap-7 pt-6 sm:grid-cols-2 lg:grid-cols-3">
+                <CompanyBlock label="Built by" items={developers} empty="Developer information unavailable" />
+                <CompanyBlock label="Put out into the world by" items={publishers} empty="Publisher information unavailable" />
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <p className={eyebrow}>Find your copy</p>
+                  {websites.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {websites.map((site) => (
+                        <a key={site.id ?? site.url} href={site.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-[11px] text-white/65 transition hover:border-[#d9ff70]/30 hover:text-[#d9ff70]">
+                          {site.name} <ExternalLink size={11} />
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-white/40">No store links available.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {premiumTab === "dlc" && (
+              <div className="pt-6">
+                {dlcList.length ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {dlcList.map((item) => {
+                      const dlcImage = igdbImage(item.image, "t_screenshot_big");
+                      return (
                         <Link key={item.id ?? item.slug} href={`/game/${item.slug}`} className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025] transition hover:-translate-y-1 hover:border-[#d9ff70]/30 hover:bg-white/[0.045]">
                           <div className="relative aspect-[16/9] overflow-hidden bg-[#17181e]">
-                            {item.image ? <Image src={item.image} alt={item.name} fill unoptimized sizes="(max-width: 640px) 50vw, 25vw" className="object-cover transition duration-700 group-hover:scale-105" /> : <div className="flex h-full items-center justify-center text-white/20"><Gamepad2 size={24} /></div>}
+                            {dlcImage ? (
+                              <Image src={dlcImage} alt={item.name} fill unoptimized sizes="(max-width: 640px) 50vw, 25vw" className="object-cover transition duration-700 group-hover:scale-105" />
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-white/20"><Gamepad2 size={24} /></div>
+                            )}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                             <span className="absolute bottom-2 left-3 text-[9px] font-black uppercase tracking-[0.2em] text-[#d9ff70]">Expansion file</span>
                           </div>
@@ -589,17 +685,61 @@ export default function GamePage() {
                             {item.released && <p className="mt-1.5 text-[10px] text-white/35">{formatDate(item.released)}</p>}
                           </div>
                         </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-white/10 px-5 py-12 text-center">
-                      <Gamepad2 size={24} className="mx-auto text-white/25" />
-                      <p className="mt-3 text-sm font-semibold text-white/60">No extra worlds found.</p>
-                      <p className="mt-1 text-xs text-white/30">This file has no DLC listed right now.</p>
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-white/10 px-5 py-12 text-center">
+                    <Gamepad2 size={24} className="mx-auto text-white/25" />
+                    <p className="mt-3 text-sm font-semibold text-white/60">No extra worlds found.</p>
+                    <p className="mt-1 text-xs text-white/30">This file has no DLC listed right now.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {premiumTab === "media" && videos.length > 0 && (
+              <div className="pt-6">
+                <p className={eyebrow}>Trailers &amp; clips</p>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {videos.slice(0, 6).map((video) => (
+                    <a key={video.videoId} href={`https://www.youtube.com/watch?v=${video.videoId}`} target="_blank" rel="noopener noreferrer" className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025] transition hover:-translate-y-1 hover:border-[#d9ff70]/30">
+                      <div className="relative aspect-video overflow-hidden bg-[#17181e]">
+                        <Image src={`https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`} alt={video.name || "Game video"} fill unoptimized sizes="(max-width: 640px) 100vw, 33vw" className="object-cover transition duration-700 group-hover:scale-105" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/35 transition group-hover:bg-black/20">
+                          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#d9ff70] text-[#08090c]"><Play size={18} fill="currentColor" /></span>
+                        </div>
+                      </div>
+                      <p className="truncate px-4 py-3 text-xs font-bold text-white/75">{video.name || "Watch on YouTube"}</p>
+                    </a>
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Similar games */}
+        {similarGames.length > 0 && (
+          <section className="mt-6 overflow-hidden rounded-[1.75rem] border border-white/[0.09] bg-[#101116] p-6 sm:p-8">
+            <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#d9ff70]">06 / Up next</p>
+            <h2 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">If you liked this.</h2>
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+              {similarGames.map((item) => {
+                const cover = igdbImage(item.coverImage, "t_cover_big");
+                return (
+                  <Link key={item.id ?? item.slug} href={`/game/${item.slug}`} className="group min-w-0">
+                    <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#17181e] transition group-hover:-translate-y-1 group-hover:border-[#d9ff70]/30">
+                      {cover ? (
+                        <Image src={cover} alt={item.name} fill unoptimized sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw" className="object-cover transition duration-700 group-hover:scale-105" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-white/20"><Gamepad2 size={26} /></div>
+                      )}
+                    </div>
+                    <p className="mt-2 truncate text-xs font-bold text-white/70 transition group-hover:text-[#d9ff70]">{item.name}</p>
+                  </Link>
+                );
+              })}
             </div>
           </section>
         )}
@@ -608,7 +748,7 @@ export default function GamePage() {
         <section className="mt-16 sm:mt-20">
           <div className="grid gap-8 lg:grid-cols-[.75fr_1.25fr] lg:gap-12">
             <div className="lg:sticky lg:top-8 lg:self-start">
-              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#d9ff70]">04 / The campfire</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#d9ff70]">07 / The campfire</p>
               <h2 className="mt-4 text-4xl font-black leading-[0.95] tracking-[-0.05em] sm:text-5xl">Your turn<br />to talk.</h2>
               <p className="mt-4 max-w-sm text-sm leading-7 text-white/45">Games are better when the stories get shared. Leave a signal for the next player.</p>
               <div className="mt-7 flex items-center gap-3 border-t border-white/10 pt-5">
@@ -694,7 +834,7 @@ export default function GamePage() {
 
               <div className="mt-8 flex items-end justify-between gap-4 border-b border-white/10 pb-4">
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/30">From the community</p>
+                  <p className={eyebrow}>From the community</p>
                   <h3 className="mt-2 text-xl font-black tracking-tight">Player notes <span className="ml-1 text-[#d9ff70]">({writtenReviews.length})</span></h3>
                 </div>
                 <span className="hidden text-[9px] font-bold uppercase tracking-[0.2em] text-white/25 sm:block">Unfiltered opinions</span>
@@ -716,7 +856,11 @@ export default function GamePage() {
                         <div className="flex items-start justify-between gap-3">
                           <Link href={`/user/${review.userId?._id}`} className="flex min-w-0 items-center gap-3">
                             <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#1b1d21] text-xs font-black text-[#d9ff70] transition group-hover:border-[#d9ff70]/25">
-                              {review.userId?.avatar ? <img src={review.userId.avatar} alt={review.userId?.name || "Player avatar"} className="h-full w-full object-cover" /> : initials(review.userId?.name)}
+                              {review.userId?.avatar ? (
+                                <Image src={review.userId.avatar} alt={review.userId?.name || "Player avatar"} fill unoptimized sizes="44px" className="object-cover" />
+                              ) : (
+                                initials(review.userId?.name)
+                              )}
                             </div>
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
@@ -734,7 +878,7 @@ export default function GamePage() {
                           <button type="button" onClick={() => reportReview(review._id)} className="shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold text-white/30 transition hover:bg-red-400/10 hover:text-red-300">Report</button>
                         </div>
 
-                        <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-white/65">{review.reviewText}</p>
+                        <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-7 text-white/65">{review.reviewText}</p>
 
                         <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/[0.07] pt-4">
                           <button type="button" onClick={() => reactToReview(review._id, "like")} className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-bold transition", review.reaction === "like" ? "border-[#d9ff70]/30 bg-[#d9ff70]/10 text-[#d9ff70]" : "border-white/10 text-white/40 hover:border-[#d9ff70]/25 hover:text-[#d9ff70]")}>
@@ -765,4 +909,35 @@ export default function GamePage() {
 
 function LockNote() {
   return <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#d9ff70]/30 text-[9px]">↗</span>;
+}
+
+function ChipGroup({ label, items, limit }: { label: string; items?: string[]; limit?: number }) {
+  if (!items?.length) return null;
+  const visible = limit ? items.slice(0, limit) : items;
+  return (
+    <div>
+      <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/35">{label}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {visible.map((item) => (
+          <span key={item} className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-medium text-white/65">{item}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// items === undefined means the API stripped it (free user) -> locked state.
+function CompanyBlock({ label, items, empty }: { label: string; items?: { name: string }[]; empty: string }) {
+  return (
+    <div>
+      <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/30">{label}</p>
+      {Array.isArray(items) ? (
+        <p className="mt-2 break-words text-sm leading-6 text-white/75">{items.length ? items.map((item) => item.name).join(", ") : empty}</p>
+      ) : (
+        <p className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#d9ff70]/20 bg-[#d9ff70]/[0.06] px-3 py-1.5 text-[11px] font-bold text-[#d9ff70]">
+          <Lock size={12} /> Premium members only
+        </p>
+      )}
+    </div>
+  );
 }

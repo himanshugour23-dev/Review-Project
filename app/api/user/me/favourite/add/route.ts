@@ -3,7 +3,7 @@ import { getToken } from "next-auth/jwt";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
-import Game from "@/models/game";
+import igdbGames from "@/models/igdbGames";
 
 
 export async function POST(req: NextRequest) {
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
    
-    const exists = await Game.exists({ _id: gameId });
+    const exists = await igdbGames.exists({ _id: gameId });
     if (!exists)
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
 

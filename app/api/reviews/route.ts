@@ -1,4 +1,4 @@
-import Game from "@/models/game";
+import igdbGames from "@/models/igdbGames";
 import Review from "@/models/review";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
@@ -26,7 +26,7 @@ export async function POST(req:NextRequest){
 
          if(!gameId || !rating) return NextResponse.json("ratings is required", {status: 400});
 
-         const game = await Game.findById(gameId);
+         const game = await igdbGames.findById(gameId);
 
          if(!game) return NextResponse.json("Game not found", {status: 404});
         
@@ -70,7 +70,7 @@ export async function POST(req:NextRequest){
             }
             ]);
 
-         await Game.findOneAndUpdate({
+         await igdbGames.findOneAndUpdate({
             _id : gameObjectId,    
          },
         {

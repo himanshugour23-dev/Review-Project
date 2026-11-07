@@ -6,6 +6,7 @@ export async function GET() {
   try {
     await connectToDatabase();
     const FEATURED_SLUGS = [
+      "grand-theft-auto-vi",
       "crimson-desert-enhanced--1",
       "dark-souls-iii",
       "the-last-of-us-part-ii",

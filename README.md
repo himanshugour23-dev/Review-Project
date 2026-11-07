@@ -1,8 +1,8 @@
 # Baclogged: Game Review & Collection Platform
 
-Baclogged is a full-stack game review and collection platform where users can discover games, maintain their personal collections, rate and review games, and interact with community content.
+Baclogged is a full-stack game review and collection platform where users can discover games, maintain personal collections, rate and review titles, and interact with community content.
 
-The platform integrates the RAWG Video Games Database API with a MongoDB-backed caching layer to reduce redundant external API requests. It also includes role-based authentication, moderation workflows, AI-powered avatar moderation, secure payment processing, database-level constraints, rate limiting, and duplicate-prevention mechanisms.
+The platform uses the IGDB API as its game data source, backed by MongoDB persistence and caching. It also includes OAuth authentication, role-based access control, review moderation, AI-assisted avatar moderation, secure payment processing, and database-level integrity constraints.
 
 ## 🚀 Live Demo & Repository
 
@@ -15,17 +15,29 @@ The platform integrates the RAWG Video Games Database API with a MongoDB-backed 
 
 ### 🎮 Game Discovery & Collection
 
-- Browse and discover games using the RAWG Video Games Database API.
-- View detailed game information including metadata, genres, ratings, release information, and artwork.
+- Browse and discover games using the IGDB API.
+- View detailed game information, including summaries, storylines, genres, platforms, themes, game modes, player perspectives, keywords, franchises, release information, ratings, screenshots, videos, and similar games.
+- Explore developer and publisher information, plus game artworks through the Premium tier.
 - Maintain personal game collections and track games based on their status.
-- Game data is progressively persisted into the local database as users interact with the platform.
+- Persist game records in MongoDB so frequently requested information can be served locally.
 
-### ⚡ API Caching Layer
+### 🔄 RAWG-to-IGDB Data Migration
 
-- Implemented a MongoDB-backed caching layer around the RAWG API.
-- Previously fetched game data is served from the database instead of repeatedly requesting the external API.
-- Reduces redundant third-party API calls and improves response time for repeated searches.
-- Cached records include game metadata and freshness information to control when data should be refreshed.
+- Migrated the platform's game data source from RAWG to IGDB.
+- Introduced a dedicated IGDB game model and collection (`igdb_games`) with IGDB-specific identifiers and metadata.
+- Updated game data handling to use IGDB IDs, slugs, cover image references, ratings, platforms, genres, and expanded metadata.
+- Migrated existing review references from the legacy RAWG game records to their corresponding IGDB game records.
+- Used slug-based mapping between legacy and replacement game records to resolve the new game references.
+- Kept review documents and their user-generated content intact while updating their associated game IDs.
+- Created a backup of review-to-game references before applying the migration, allowing the previous references to be recovered if needed.
+
+### ⚡ IGDB Integration & Database Caching
+
+- Integrated the IGDB API as the primary source for game metadata.
+- Implemented the IGDB authentication flow using Twitch credentials and OAuth access tokens.
+- Store game information in MongoDB to reduce repeated external API requests.
+- Serve previously fetched game records from the database and refresh records according to their freshness timestamp.
+- Store expanded IGDB metadata, including ratings, screenshots, artworks, videos, platforms, genres, themes, game modes, player perspectives, keywords, franchises, and related games.
 
 ### 🔐 Authentication & Role-Based Access Control
 
@@ -40,6 +52,11 @@ The platform integrates the RAWG Video Games Database API with a MongoDB-backed 
 - Implemented HMAC-SHA256 signature verification for payment authenticity.
 - Added server-side price validation to prevent client-side price manipulation.
 - Implemented idempotent payment callback handling to prevent duplicate access grants.
+
+### ⭐ Premium Features
+
+- Premium access unlocks additional game information, including developers, publishers, and artworks.
+- Core discovery and game information remain available without Premium, including screenshots, videos, websites and store links, DLC, similar games, ratings, genres, platforms, themes, game modes, keywords, franchises, summaries, and storylines.
 
 ### 🛡️ Review & Moderation System
 
@@ -88,6 +105,7 @@ The platform integrates the RAWG Video Games Database API with a MongoDB-backed 
 
 - NextAuth.js
 - OAuth
+- Twitch OAuth 2.0 (IGDB API authentication)
 - Role-Based Access Control (RBAC)
 
 ### Database
@@ -97,7 +115,8 @@ The platform integrates the RAWG Video Games Database API with a MongoDB-backed 
 
 ### External Services
 
-- RAWG Video Games Database API
+- IGDB API (game metadata and discovery)
+- Twitch OAuth 2.0 (IGDB access tokens)
 - Razorpay Payment Gateway
 - Gemini API (pre-upload avatar screening)
 - Cloudinary (image hosting and Rekognition-based moderation)
@@ -113,7 +132,7 @@ The platform integrates the RAWG Video Games Database API with a MongoDB-backed 
 
 ## 🏗️ Architecture & Database Design
 
-Baclogged uses a MongoDB-based architecture with separate collections for users, games, reviews, reports, and user-specific game data.
+Baclogged uses a MongoDB-based architecture with separate collections for users, IGDB games, reviews, reports, payments, and user-specific game data.
 
 ### 🗺️ System Architecture Diagram
 
@@ -158,14 +177,15 @@ subgraph group_commerce["Premium and payments"]
   node_paymentdata[("Payments<br/>[payment.ts]")]
 end
 
-subgraph group_platform["Data and integrations"]
-  node_rawgclient["RAWG client<br/>[rawg.ts]"]
-  node_gamecache[("Game cache<br/>[game.ts]")]
+subgraph group_platform["Game data and integrations"]
+  node_igdbclient["IGDB client<br/>[igdb.ts]"]
+  node_igdbcache[("IGDB game records<br/>[igdbGames.ts]")]
+  node_twitchauth["Twitch OAuth 2.0"]
   node_dbconnection["Database connection<br/>[db.ts]"]
 end
 
 node_visitor(("Player"))
-node_rawgservice["RAWG service"]
+node_igdbservice["IGDB API"]
 node_cloudinary["Cloudinary"]
 node_razorpay["Razorpay"]
 node_database[("MongoDB")]
@@ -176,18 +196,20 @@ node_visitor -->|"opens game"| node_gameview
 node_discover -.->|"loads picks"| node_gameendpoints
 node_browse -.->|"requests games"| node_gameendpoints
 node_gameview -.->|"loads details"| node_gameapi
-node_gameapi -->|"reads game"| node_gamecache
+node_gameapi -->|"reads game"| node_igdbcache
 node_gameapi -->|"loads reviews"| node_reviewdata
 node_gameapi -->|"loads authors"| node_userdata
 node_gameapi -->|"loads reactions"| node_reactiondata
-node_gameapi -->|"fetches details"| node_rawgclient
-node_rawgclient -.->|"requests metadata"| node_rawgservice
+node_gameapi -->|"requests game data"| node_igdbclient
+node_igdbclient -.->|"gets access token"| node_twitchauth
+node_twitchauth -.->|"authenticates"| node_igdbservice
+node_igdbclient -.->|"requests metadata"| node_igdbservice
 node_visitor -->|"writes review"| node_reviewform
 node_reviewform -.->|"submits review"| node_reviewapi
 node_reviewapi -->|"resolves author"| node_userdata
-node_reviewapi -->|"checks game"| node_gamecache
+node_reviewapi -->|"checks game"| node_igdbcache
 node_reviewapi -->|"upserts review"| node_reviewdata
-node_reviewapi -->|"updates rating"| node_gamecache
+node_reviewapi -->|"updates rating"| node_igdbcache
 node_visitor -->|"reacts"| node_reactionapi
 node_reactionapi -->|"writes reaction"| node_reactiondata
 node_visitor -->|"reports review"| node_reportapi
@@ -225,39 +247,56 @@ classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
 classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
 classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
 classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
-classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
 class node_browse,node_discover,node_gameview,node_gameapi,node_gameendpoints toneBlue
 class node_reviewform,node_reviewapi,node_reviewdata,node_reactionapi,node_reactiondata,node_reportapi,node_reportdata,node_moderation,node_database toneAmber
 class node_auth,node_authroute,node_profiles,node_userapi,node_userdata,node_avatar,node_avatarapi,node_webhook toneMint
 class node_checkout,node_checkoutbutton,node_orderapi,node_paymentapi,node_paymentdata toneRose
-class node_rawgclient,node_gamecache,node_dbconnection,node_visitor,node_rawgservice,node_cloudinary,node_razorpay toneIndigo
+class node_igdbclient,node_igdbcache,node_twitchauth,node_visitor,node_igdbservice,node_cloudinary,node_razorpay toneIndigo
 ```
 
 ### 👤 Users & Profiles
 
 Stores user identity, authentication provider information, profile details, roles, and user-specific game preferences.
 
-### 🎮 Game Cache
+### 🎮 IGDB Game Records
 
-Stores game information retrieved from the RAWG API.
+Stores game information retrieved from IGDB in the dedicated `igdb_games` collection.
 
-The cached data contains information such as:
+The stored game data includes:
 
-- RAWG Game ID
-- Game name
-- Slug
+- IGDB game ID
+- Game name and slug
 - Cover image
-- Genres
-- Release date
-- Average rating
-- Review count
-- Last fetched timestamp
+- Summary and storyline
+- Genres, platforms, themes, game modes, and player perspectives
+- Keywords and franchises
+- Release date and category
+- IGDB rating and rating counts
+- Aggregated rating and rating counts
+- Screenshots, artworks, and videos
+- Similar games and related game information
+- Last-fetched timestamp
 
-This allows frequently requested games to be served from MongoDB instead of repeatedly querying the RAWG API.
+This allows frequently requested game information to be served from MongoDB instead of repeatedly querying IGDB.
+
+### 🔄 Game and Review Migration
+
+The migration moved the application from the legacy RAWG game collection to the new IGDB game collection.
+
+At a high level, the migration process:
+
+1. Reads existing game and review references from the legacy data.
+2. Builds a mapping between legacy RAWG game slugs and their corresponding IGDB game records.
+3. Resolves the destination IGDB game document for each existing review.
+4. Updates the review's `gameId` reference to the new IGDB document ID.
+5. Keeps the existing review documents and user-generated review content rather than recreating reviews.
+6. Uses a backup of the original review-to-game references as a recovery point.
+
+The dedicated IGDB model and collection keep the new game schema separate from the legacy RAWG schema.
 
 ### ⭐ Reviews & Ratings
 
-Reviews are associated with both users and games.
+Reviews are associated with both users and IGDB game records.
 
 A unique database constraint ensures:
 

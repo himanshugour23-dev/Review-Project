@@ -1,7 +1,5 @@
-
 const IGDB_BASE_URL = "https://api.igdb.com/v4";
 const TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
-
 const CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
 
@@ -91,7 +89,6 @@ async function igdbRequest<T>(
       `IGDB ${endpoint} failed (${res.status}): ${error}`
     );
   }
-
   return res.json() as Promise<T>;
 }
 
@@ -101,12 +98,9 @@ interface IGDBGame {
   slug: string;
   summary?: string;
   storyline?: string;
-
   first_release_date?: number;
-
   rating?: number;
   rating_count?: number;
-
   aggregated_rating?: number;
   aggregated_rating_count?: number;
 
@@ -114,7 +108,6 @@ interface IGDBGame {
   total_rating_count?: number;
 
   hypes?: number;
-
   game_type?: number;
   parent_game?: number;
 
@@ -243,25 +236,16 @@ function normalizeIGDBGameSummary(game: IGDBGame) {
     slug: game.slug,
     name: game.name,
     coverImage: getIGDBImage(game.cover?.image_id),
-
     genres: game.genres?.map((g) => g.name) ?? [],
-
     platforms: game.platforms?.map((p) => p.name) ?? [],
-
     released: game.first_release_date
       ? new Date(game.first_release_date * 1000)
       : undefined,
-
     igdbRating: game.rating ?? 0,
-
     metacritic: game.aggregated_rating ?? 0,
-
     totalRating: game.total_rating ?? 0,
-
     totalRatingCount: game.total_rating_count ?? 0,
-
     igdbRatingCount: game.rating_count ?? 0,
-
     aggregatedRatingCount:
       game.aggregated_rating_count ?? 0,
   };
@@ -274,47 +258,31 @@ function normalizeIGDBGameDetails(game: IGDBGame) {
     igdbId: game.id,
     slug: game.slug,
     name: game.name,
-
     coverImage: getIGDBImage(game.cover?.image_id),
-
     description: game.summary,
     summary: game.summary,
     storyline: game.storyline,
-
     released: game.first_release_date
       ? new Date(game.first_release_date * 1000)
       : undefined,
-
     igdbRating: game.rating ?? 0,
     metacritic: game.aggregated_rating ?? 0,
-
     totalRating: game.total_rating ?? 0,
     totalRatingCount: game.total_rating_count ?? 0,
-
     igdbRatingCount: game.rating_count ?? 0,
     aggregatedRatingCount:
       game.aggregated_rating_count ?? 0,
-
     hypes: game.hypes ?? 0,
-
     category: game.game_type,
     parentGameId: game.parent_game,
-
     genres: game.genres?.map((g) => g.name) ?? [],
-
     platforms: game.platforms?.map((p) => p.name) ?? [],
-
     themes: game.themes?.map((t) => t.name) ?? [],
-
     gameModes: game.game_modes?.map((m) => m.name) ?? [],
-
     playerPerspectives:
       game.player_perspectives?.map((p) => p.name) ?? [],
-
     keywords: game.keywords?.map((k) => k.name) ?? [],
-
     franchises: game.franchises?.map((f) => f.name) ?? [],
-
     screenshots:
       game.screenshots?.map((s) =>
         getIGDBImage(s.image_id, "t_screenshot_big")
